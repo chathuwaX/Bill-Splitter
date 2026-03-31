@@ -31,6 +31,27 @@ export default function Layout() {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
   }
 
+  // Mark a single notification as read then navigate to its target
+  const handleNotifClick = async (n) => {
+    // Mark as read immediately (fire-and-forget)
+    if (!n.is_read) {
+      api.post(`/notifications/${n.id}/read`).catch(() => {})
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+    }
+
+    // Resolve target path from type + reference_id
+    const id = n.reference_id
+    let path = null
+    if (n.type === 'bill' && id)     path = '/bills'
+    if (n.type === 'payment' && id)  path = '/history'
+    if (n.type === 'friend' && id)   path = '/friends'
+
+    if (path) {
+      setShowNotifs(false)
+      navigate(path)
+    }
+  }
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/friends', icon: Users, label: 'Friends' },
@@ -94,7 +115,11 @@ export default function Layout() {
                     {notifications.length === 0 ? (
                       <div className={styles.emptyNotif}><Bell size={32} opacity={0.3} /><p>No notifications yet</p></div>
                     ) : notifications.slice(0, 15).map(n => (
-                      <div key={n.id} className={`${styles.notifItem} ${!n.is_read ? styles.unread : ''}`}>
+                      <div key={n.id}
+                        className={`${styles.notifItem} ${!n.is_read ? styles.unread : ''}`}
+                        onClick={() => handleNotifClick(n)}
+                        style={{ cursor: n.reference_id ? 'pointer' : 'default' }}
+                      >
                         <div className={`${styles.notifDot} ${styles[`dot_${n.type}`]}`} />
                         <div>
                           <p className={styles.notifMsg}>{n.message}</p>

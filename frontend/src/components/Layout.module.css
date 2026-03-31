@@ -80,37 +80,63 @@
 .notifWrapper { position: relative; }
 
 .notifPanel {
-  position: absolute; top: calc(100% + 8px); right: 0; width: 320px;
-  max-height: 400px; overflow: hidden; display: flex; flex-direction: column;
-  z-index: 200; box-shadow: var(--shadow);
+  position: absolute; 
+  top: calc(100% + 8px); 
+  right: 0; 
+  
+  /* Size Fixes */
+  width: 380px; /* Reduced from 500px for a more standard dropdown size */
+  max-width: none; /* Prevents global CSS from squishing it to the bell icon's width */
+  
+  /* Visual Fixes */
+  background: var(--bg2); /* Added background so it doesn't overlap text transparently */
+  border: 1px solid var(--card-border); /* Added a border for clean edges */
+  border-radius: 8px; /* Added rounded corners */
+  
+  max-height: 520px; 
+  overflow: hidden; 
+  display: flex; 
+  flex-direction: column;
+  z-index: 200; 
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5); /* Stronger shadow to pop out from the background */
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .notifHeader {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid var(--card-border);
-  font-size: 14px; font-weight: 600;
+  padding: 16px 18px; border-bottom: 1px solid var(--card-border);
+  font-size: 15px; font-weight: 700; flex-shrink: 0;
 }
 
-.markRead { background: none; border: none; color: var(--primary-light); font-size: 12px; cursor: pointer; font-family: inherit; }
-.notifList { overflow-y: auto; }
+.markRead { background: none; border: none; color: var(--primary-light); font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 600; }
+.markRead:hover { text-decoration: underline; }
+
+.notifList { overflow-y: auto; flex: 1; max-height: 420px; }
 
 .notifItem {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 16px; border-bottom: 1px solid var(--card-border); transition: var(--transition);
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--card-border); transition: var(--transition);
+  cursor: default;
 }
-.notifItem:hover { background: rgba(255,255,255,0.03); }
-.notifItem.unread { background: rgba(99,102,241,0.05); }
+.notifItem:last-child { border-bottom: none; }
+.notifItem:hover { background: rgba(255,255,255,0.04); }
+.notifItem.unread { background: rgba(99,102,241,0.06); }
 
-.notifDot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.notifDot { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
 .dot_bill { background: var(--primary); }
 .dot_payment { background: var(--green); }
 .dot_friend { background: var(--purple); }
 .dot_info { background: var(--text-dim); }
 
-.notifMsg { font-size: 13px; color: var(--text); line-height: 1.4; }
-.notifTime { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.notifMsg { font-size: 13px; color: var(--text); line-height: 1.5; }
+.notifTime { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
 
-.emptyNotif { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px; color: var(--text-dim); font-size: 13px; }
+.emptyNotif { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 24px; color: var(--text-dim); font-size: 13px; }
 
 .content {
   flex: 1;
@@ -128,7 +154,7 @@
   .sidebar { width: 200px; padding: 20px 12px; }
   .main { margin-left: 200px; }
   .content { padding: 24px 20px; }
-  .notifPanel { width: 280px; }
+  .notifPanel { width: 320px; }
 }
 
 /* ── Mobile (≤ 768px) ── */
@@ -139,7 +165,10 @@
   .main { margin-left: 0; }
   .menuBtn { display: flex; }
   .content { padding: 16px 12px; }
-  .notifPanel { width: calc(100vw - 24px); right: -8px; }
+  .notifPanel { 
+    width: calc(100vw - 24px); 
+    max-width: 100vw; /* Reset the max-width for mobile */
+    right: -8px; }
 }
 
 /* ── Small mobile (≤ 480px) ── */
