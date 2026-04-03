@@ -7,6 +7,8 @@ import { LayoutDashboard, Users, Receipt, History, Bell, LogOut, Sun, Moon, Menu
 import styles from './Layout.module.css'
 
 function formatRelativeTime(dateStr) {
+  if (!dateStr) return ''
+  if (!dateStr.endsWith('Z') && !dateStr.includes('+')) dateStr += 'Z'
   const now = new Date()
   const d = new Date(dateStr)
   const diffMs = now - d

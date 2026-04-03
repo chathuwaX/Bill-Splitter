@@ -10,6 +10,8 @@ export default function MergeDetailsModal({ debt, currentUserId, onClose, onSett
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
 
+  const parseDate = dStr => new Date(dStr + (!dStr.endsWith('Z') && !dStr.includes('+') ? 'Z' : ''))
+
   useEffect(() => {
     api.get(`/debts/${debt.id}/sources`)
       .then(r => setSources(r.data))
@@ -83,7 +85,7 @@ export default function MergeDetailsModal({ debt, currentUserId, onClose, onSett
                     <span className={styles.sourceTitle}>{s.bill_title}</span>
                     {s.bill_description && <span className={styles.sourceDesc}>{s.bill_description}</span>}
                     <span className={styles.sourceMeta}>
-                      {s.direction === 'you_owe' ? 'You owed' : 'They owed'} · {new Date(s.created_at).toLocaleDateString()}
+                      {s.direction === 'you_owe' ? 'You owed' : 'They owed'} · {parseDate(s.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <span className={`${styles.sourceAmount} ${s.direction === 'you_owe' ? 'amount-negative' : 'amount-positive'}`}>

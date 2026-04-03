@@ -13,6 +13,8 @@ export default function HistoryPage() {
   const [payments, setPayments] = useState([])
   const [debts, setDebts] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const parseDate = dStr => new Date(dStr + (!dStr.endsWith('Z') && !dStr.includes('+') ? 'Z' : ''))
   const [tab, setTab] = useState('all')
   const [viewDebt, setViewDebt] = useState(null)
 
@@ -45,9 +47,9 @@ export default function HistoryPage() {
 
   // Build unified timeline
   const timeline = [
-    ...bills.map(b => ({ type: 'bill', data: b, date: new Date(b.created_at) })),
-    ...payments.map(p => ({ type: 'payment', data: p, date: new Date(p.created_at) })),
-    ...debts.map(d => ({ type: 'merge', data: d, date: new Date(d.created_at) })),
+    ...bills.map(b => ({ type: 'bill', data: b, date: parseDate(b.created_at) })),
+    ...payments.map(p => ({ type: 'payment', data: p, date: parseDate(p.created_at) })),
+    ...debts.map(d => ({ type: 'merge', data: d, date: parseDate(d.created_at) })),
   ].sort((a, b) => b.date - a.date)
 
   const filtered = tab === 'all'

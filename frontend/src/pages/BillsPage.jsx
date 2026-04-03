@@ -79,7 +79,7 @@ export default function BillsPage() {
                       {bill.description && <p className={styles.billDesc}>{bill.description}</p>}
                       <div className={styles.billMeta}>
                         <span><Users size={12} /> {bill.participants.length} people</span>
-                        <span>{new Date(bill.created_at).toLocaleDateString()}</span>
+                        <span>{new Date(bill.created_at + (!bill.created_at.endsWith('Z') && !bill.created_at.includes('+') ? 'Z' : '')).toLocaleDateString()}</span>
                         <span>Your share: <strong>LKR {myShare.toFixed(2)}</strong></span>
                       </div>
                     </div>
