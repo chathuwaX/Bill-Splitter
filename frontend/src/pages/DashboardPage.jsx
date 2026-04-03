@@ -194,29 +194,54 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className={styles.statsGrid}>
-          <div className={`${styles.statCard} glass`}>
-            <div className={styles.statIcon} style={{ background: 'rgba(16,185,129,0.15)' }}><TrendingUp size={20} color="#10b981" /></div>
-            <div><p className={styles.statLabel}>Others owe you</p><p className={`${styles.statValue} amount-positive`}>LKR <AnimatedNumber value={totalToReceive} /></p></div>
+        <div className={styles.heroWrapper}>
+          <div className={`${styles.heroNetCard} glass`} style={{ 
+            borderColor: computedNet === 0 && totalToReceive === 0 ? 'rgba(255,255,255,0.1)' : computedNet >= 0 ? 'rgba(38,222,129,0.3)' : 'rgba(255,107,107,0.3)',
+            background: computedNet === 0 && totalToReceive === 0 ? 'var(--card)' : computedNet >= 0 ? 'linear-gradient(135deg, rgba(38,222,129,0.1), rgba(38,222,129,0.02))' : 'linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,107,107,0.02))' 
+          }}>
+            <div className={styles.heroNetLabel}>Total Net Balance</div>
+            {computedNet === 0 && totalToReceive === 0 && totalToGive === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)' }}>All Settled Up! 🎉</span>
+                <span style={{ fontSize: 15, color: 'var(--primary-light)', fontWeight: 500 }}>Time for another dinner?</span>
+              </div>
+            ) : (
+              <div className={`${styles.heroNetValue} ${computedNet >= 0 ? 'amount-positive' : 'amount-negative'}`}>
+                {computedNet >= 0 ? '+' : '-'}LKR <AnimatedNumber value={Math.abs(computedNet)} />
+              </div>
+            )}
           </div>
-          <div className={`${styles.statCard} glass`}>
-            <div className={styles.statIcon} style={{ background: 'rgba(239,68,68,0.15)' }}><TrendingDown size={20} color="#ef4444" /></div>
-            <div><p className={styles.statLabel}>You owe others</p><p className={`${styles.statValue} amount-negative`}>LKR <AnimatedNumber value={totalToGive} /></p></div>
-          </div>
-          <div className={`${styles.statCard} glass ${styles.netCard}`} style={{ borderColor: computedNet >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)' }}>
-            <div className={styles.statIcon} style={{ background: computedNet >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' }}><Wallet size={20} color={computedNet >= 0 ? '#10b981' : '#ef4444'} /></div>
-            <div><p className={styles.statLabel}>Net balance</p><p className={`${styles.statValue} ${computedNet >= 0 ? 'amount-positive' : 'amount-negative'}`}>{computedNet >= 0 ? '+' : '-'}LKR <AnimatedNumber value={Math.abs(computedNet)} /></p></div>
+          
+          <div className={styles.miniStatsRow}>
+            <div className={`${styles.statCard} glass`}>
+              <div className={styles.statIcon} style={{ background: 'rgba(38,222,129,0.15)' }}><TrendingUp size={20} color="var(--green)" /></div>
+              <div><p className={styles.statLabel}>Others owe you</p><p className={`${styles.statValue} amount-positive`}>LKR <AnimatedNumber value={totalToReceive} /></p></div>
+            </div>
+            <div className={`${styles.statCard} glass`}>
+              <div className={styles.statIcon} style={{ background: 'rgba(255,107,107,0.15)' }}><TrendingDown size={20} color="var(--red)" /></div>
+              <div><p className={styles.statLabel}>You owe others</p><p className={`${styles.statValue} amount-negative`}>LKR <AnimatedNumber value={totalToGive} /></p></div>
+            </div>
           </div>
         </div>
 
-        <div style={{ width: '100%', display: 'flex' }}>
-          <div className={`${styles.section} glass`} style={{ flexGrow: 1, width: '100%' }}>
+        <div className={styles.dashboardGrid}>
+          {/* Left: Friend Summary */}
+          <div className={`${styles.section} glass`}>
             <div className={styles.sectionHeader}>
-              <div className={styles.sectionTitle}><Users size={16} /> Friends</div>
+              <div className={styles.sectionTitle}><Users size={16} /> Friend Summary</div>
               <Link to="/friends" className={styles.seeAll}>See all <ArrowRight size={14} /></Link>
             </div>
             {friends.length === 0 ? (
-              <div className={styles.empty}><Users size={40} opacity={0.2} /><p>No friends yet</p><p className={styles.emptyHint}>Add friends to start splitting bills 🎉</p></div>
+              <div className={styles.empty} style={{ padding: '50px 20px' }}>
+                <div style={{ background: 'var(--bg2)', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Users size={32} color="var(--primary)" />
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No friends yet</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24, padding: '0 20px', lineHeight: 1.5 }}>Add some friends to your network to start sharing expenses easily.</p>
+                <Link to="/friends" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+                  Find Friends
+                </Link>
+              </div>
             ) : friends.slice(0, 6).map(({ friend, to_receive, to_give }) => {
               // ── Per-friend balance display ──────────────────────────────────
               // to_receive — DB: accepted bills I created → friend owes me (green)
@@ -233,7 +258,7 @@ export default function DashboardPage() {
               return (
                 <div key={friend.id} className={styles.friendRow}>
                   {/* Friend Identity */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.2' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                     <div className={styles.friendAvatar} style={{ background: friend.avatar_color }}>{initials(friend.full_name || friend.username)}</div>
                     <div className={styles.friendInfo}>
                       <span className={styles.friendName}>{friend.full_name || friend.username}</span>
@@ -241,73 +266,103 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Horizontal Data Columns container */}
-                  <div style={{ display: 'flex', flex: '2', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {/* Data and Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end', flexGrow: 1 }}>
+                    {/* Amounts Container */}
+                    <div style={{ display: 'flex', gap: '16px', textAlign: 'right' }}>
+                      {give > 0 && (
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>You Owe</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--red)', whiteSpace: 'nowrap' }}>LKR {give.toFixed(2)}</div>
+                        </div>
+                      )}
+                      
+                      {recv > 0 && (
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Others Owe</div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--green)', whiteSpace: 'nowrap' }}>LKR {recv.toFixed(2)}</div>
+                        </div>
+                      )}
 
-                    {/* Column 1: You Owe (Far Left of data section) */}
-                    <div style={{ flex: 1, textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>You Owe</div>
-                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444', lineHeight: '1' }}>LKR {give.toFixed(2)}</div>
-                    </div>
-
-                    {/* Column 2: Others Owe (Center of data section) */}
-                    <div style={{ flex: 1, textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Others Owe</div>
-                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', lineHeight: '1' }}>LKR {recv.toFixed(2)}</div>
-                    </div>
-
-                    {/* Column 3: Action (Far Right) */}
-                    <div style={{ flex: '0.9', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      {hasBalance ? (
-                        <>
-                          <button
-                            onClick={() => handleMerge(friend.id, recv, give)}
-                            disabled={!canMerge || isMerging}
-                            className="glass"
-                            title={!canMerge ? "Merge is only available when you both owe each other" : "Combine 'You Owe' and 'Others Owe' into a single net balance"}
-                            style={{
-                              padding: '8px 14px', fontSize: '0.8rem', borderRadius: '8px',
-                              background: canMerge && !isMerging ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(139, 92, 246, 0.9))' : 'rgba(255, 255, 255, 0.08)',
-                              color: canMerge && !isMerging ? '#fff' : 'rgba(255, 255, 255, 0.35)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              cursor: canMerge && !isMerging ? 'pointer' : 'not-allowed',
-                              fontWeight: '600',
-                              transition: 'all 0.2s ease',
-                              boxShadow: canMerge && !isMerging ? '0 4px 12px rgba(99, 102, 241, 0.25)' : 'none',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {isMerging ? 'Merging…' : 'Merge'}
-                          </button>
-                          <button
-                            onClick={() => openPayModal(friend, give)}
-                            disabled={give <= 0}
-                            className="glass"
-                            style={{
-                              padding: '8px 14px', fontSize: '0.8rem', borderRadius: '8px',
-                              background: give > 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.08)',
-                              color: give > 0 ? '#fff' : 'rgba(255, 255, 255, 0.35)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              cursor: give > 0 ? 'pointer' : 'not-allowed',
-                              fontWeight: '600',
-                              transition: 'all 0.2s ease',
-                              boxShadow: give > 0 ? '0 4px 12px rgba(16, 185, 129, 0.25)' : 'none',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            Pay
-                          </button>
-                        </>
-                      ) : (
-                        <div className={`${styles.friendBalance} amount-neutral`} style={{ opacity: 0.6, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                      {!hasBalance && (
+                        <div className="amount-neutral" style={{ opacity: 0.6, fontSize: '0.9rem', whiteSpace: 'nowrap', marginTop: '8px' }}>
                           Settled ✓
                         </div>
                       )}
                     </div>
+
+                    {/* Actions */}
+                    {(canMerge || give > 0) && (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {canMerge && (
+                          <button
+                            onClick={() => handleMerge(friend.id, recv, give)}
+                            disabled={isMerging}
+                            className="glass"
+                            style={{
+                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
+                              background: 'var(--card)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', fontWeight: '600'
+                            }}
+                          >
+                            {isMerging ? 'Merging…' : 'Merge'}
+                          </button>
+                        )}
+                        {give > 0 && (
+                          <button
+                            onClick={() => openPayModal(friend, give)}
+                            className="glass"
+                            style={{
+                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
+                              background: 'var(--primary)', color: 'var(--bg)', border: 'none', cursor: 'pointer', fontWeight: '700'
+                            }}
+                          >
+                            Pay
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
             })}
+          </div>
+
+          {/* Right: Recent Activity */}
+          <div className={`${styles.section} glass`}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}><Receipt size={16} /> Recent Activity</div>
+              <Link to="/bills" className={styles.seeAll}>See all <ArrowRight size={14} /></Link>
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {allBills.length === 0 ? (
+                <div className={styles.empty} style={{ padding: '50px 20px', flex: 1, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ background: 'var(--bg2)', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <Receipt size={32} color="var(--primary)" />
+                  </div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Everything is quiet</h3>
+                  <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24, padding: '0 20px', lineHeight: 1.5 }}>You have no recent bills. Ready to log a new outing?</p>
+                  <Link to="/bills?new=true" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+                    Add your first bill
+                  </Link>
+                </div>
+              ) : allBills.slice(0, 5).map(bill => {
+                const parseDate = dStr => new Date(dStr + (!dStr.endsWith('Z') && !dStr.includes('+') ? 'Z' : ''));
+                return (
+                  <Link to="/bills" key={bill.id} className={styles.billRow} style={{ textDecoration: 'none' }}>
+                    <div className={styles.billIcon}><Receipt size={16} color="var(--primary)" /></div>
+                    <div className={styles.billInfo}>
+                      <span className={styles.billTitle}>{bill.title}</span>
+                      <span className={styles.billMeta}>
+                        {parseDate(bill.created_at).toLocaleDateString()}
+                        {' • '}
+                        {bill.creator.id === user?.id ? 'You paid' : `${bill.creator.full_name || bill.creator.username} paid`}
+                      </span>
+                    </div>
+                    <div className={styles.billAmount}>LKR {bill.total_amount.toFixed(2)}</div>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>

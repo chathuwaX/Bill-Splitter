@@ -17,6 +17,23 @@
 .statValue { font-size: 22px; font-weight: 700; }
 .netCard { background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08)); }
 
+.heroWrapper { display: flex; flex-direction: column; gap: 16px; }
+.heroNetCard { 
+  display: flex; flex-direction: column; align-items: center; justify-content: center; 
+  padding: 36px 20px; gap: 12px; text-align: center;
+  border-radius: var(--radius);
+  transition: transform 0.2s ease;
+  border: 1px solid transparent;
+}
+.heroNetCard:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.heroNetValue { font-size: 42px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+.heroNetLabel { font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+
+.miniStatsRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── Main Split View ── */
+.dashboardGrid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: stretch; }
+
 /* ── Main grid: 2 cols → 1 ── */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .section { padding: 20px; }
@@ -64,11 +81,14 @@
 @media (max-width: 1024px) {
   .statsGrid { grid-template-columns: repeat(2, 1fr); }
   .grid { grid-template-columns: 1fr; }
+  .dashboardGrid { grid-template-columns: 1fr; }
 }
 
 /* ── Mobile (≤ 640px) ── */
 @media (max-width: 640px) {
   .statsGrid { grid-template-columns: 1fr; }
+  .miniStatsRow { grid-template-columns: 1fr; }
+  .heroNetValue { font-size: 32px; }
   .greeting h1 { font-size: 22px; }
   .statValue { font-size: 20px; }
   .section { padding: 16px; }
