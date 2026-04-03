@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import { UserPlus, Search, Check } from 'lucide-react'
@@ -19,11 +20,30 @@ export default function FriendsPage() {
 
   const load = async () => {
     try {
-      const [f, r] = await Promise.all([
+      const [f, r, b] = await Promise.all([
         api.get('/friends/'),
         api.get('/friends/requests'),
+        api.get('/bills/')
       ])
-      setFriends(f.data)
+      
+      const rawFriends = f.data;
+      const rawBills = b.data;
+      
+      const activityMap = {};
+      rawBills.forEach(bill => {
+        if (!bill.participants) return;
+        bill.participants.forEach(p => {
+          activityMap[p.user_id] = (activityMap[p.user_id] || 0) + 1;
+        });
+      });
+      
+      const friendsWithSizing = rawFriends.map(fObj => {
+        const count = activityMap[fObj.friend.id] || 0;
+        const size = Math.min(220, 100 + (count * 15));
+        return { ...fObj, activityCount: count, bubbleSize: size };
+      });
+      
+      setFriends(friendsWithSizing)
       setRequests(r.data)
     } finally { setLoading(false) }
   }
@@ -74,7 +94,7 @@ export default function FriendsPage() {
         </div>
 
         {loading ? (
-          <div className={styles.grid}>{[1, 2, 3, 4].map(i => <SkeletonCard key={i} height={180} />)}</div>
+          <div className={styles.grid}>{[1, 2, 3, 4].map(i => <div key={i} style={{ width: 120, height: 120, borderRadius: '50%' }} className="skeleton" />)}</div>
         ) : filtered.length === 0 ? (
           <div className={styles.empty}>
             <UserPlus size={48} opacity={0.2} />
@@ -83,17 +103,25 @@ export default function FriendsPage() {
           </div>
         ) : (
           <div className={styles.grid}>
-            {filtered.map(({ friend }) => (
-              <div key={friend.id} className={`${styles.friendCard} glass`}>
-                <div className={styles.cardTop}>
-                  <div className={styles.avatar} style={{ background: friend.avatar_color }}>{initials(friend.full_name || friend.username)}</div>
+            {filtered.map((fObj) => {
+              const { friend, bubbleSize } = fObj;
+              const fontSize = Math.max(14, bubbleSize * 0.22);
+              return (
+                <Link key={friend.id} to={`/friends/${friend.id}`} style={{ textDecoration: 'none' }} className={styles.friendBubbleWrapper}>
+                  <div className={styles.friendCard} style={{ width: bubbleSize, height: bubbleSize }}>
+                    <div className={styles.cardTop}>
+                      <div className={styles.avatar} style={{ background: friend.avatar_color, fontSize }}>
+                        {initials(friend.full_name || friend.username)}
+                      </div>
+                    </div>
+                  </div>
                   <div className={styles.info}>
                     <span className={styles.name}>{friend.full_name || friend.username}</span>
                     <span className={styles.handle}>@{friend.username}</span>
                   </div>
-                </div>
-              </div>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

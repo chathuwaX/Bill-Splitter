@@ -17,31 +17,52 @@
 .searchInput { padding-left: 40px !important; }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 20px;
 }
 
-.friendCard { padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: var(--transition); }
-.friendCard:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.cardTop { display: flex; align-items: center; gap: 12px; }
-.avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; }
-.info { min-width: 0; }
-.name { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
-.handle { display: block; font-size: 12px; color: var(--text-dim); }
-
-.balanceRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.balanceLabel { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
-.balanceAmount { font-size: 16px; font-weight: 700; }
-
-/* ── Merged debt net balance card ── */
-.mergedCard {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
-  border: 1px solid rgba(99,102,241,0.25);
-  border-radius: var(--radius-sm);
+/* Wrapper: circle + label stack */
+.friendBubbleWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
+
+.friendCard { 
+  border-radius: 50%;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.friendCard:hover { transform: scale(1.07); }
+
+.cardTop { display: contents; }
+
+/* The avatar fills the entire bubble */
+.avatar { 
+  width: 100%; height: 100%; 
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; 
+  font-weight: 800; color: white;
+  letter-spacing: 0.5px;
+}
+
+/* Label sits BELOW the bubble */
+.info { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.name { display: block; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.handle { display: block; font-size: 11px; color: var(--text-dim); }
 .mergedLabel {
   display: flex; align-items: center; gap: 4px;
   font-size: 10px; font-weight: 600; color: var(--primary-light);
