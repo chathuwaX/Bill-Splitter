@@ -34,7 +34,7 @@ export default function Layout() {
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
+    const interval = setInterval(fetchNotifications, 3000)
     return () => clearInterval(interval)
   }, [])
 
@@ -150,11 +150,26 @@ export default function Layout() {
                         onClick={() => handleNotifClick(n)}
                         style={{ cursor: n.reference_id ? 'pointer' : 'default' }}
                       >
-                        <div className={`${styles.notifDot} ${styles[`dot_${n.type}`]}`} />
-                        <div>
+                        {/* Avatar circle: initials from first word of message (the sender's name) */}
+                        <div style={{
+                          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 700, fontSize: 13, color: 'white', letterSpacing: '0.5px',
+                          background: n.type === 'payment' ? 'var(--green)' : n.type === 'friend' ? 'var(--purple)' : n.type === 'bill' ? 'var(--primary)' : 'var(--text-dim)',
+                        }}>
+                          {(n.message.split(' ')[0] || '?').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
                           <p className={styles.notifMsg}>{n.message}</p>
                           <p className={styles.notifTime}>{formatRelativeTime(n.created_at)}</p>
                         </div>
+                        {!n.is_read && (
+                          <div style={{
+                            width: 8, height: 8, borderRadius: '50%',
+                            background: 'var(--red)', flexShrink: 0, marginLeft: 8,
+                            alignSelf: 'center',
+                          }} />
+                        )}
                       </div>
                     ))}
                   </div>
