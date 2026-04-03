@@ -20,14 +20,20 @@ export default function FriendsPage() {
 
   const load = async () => {
     try {
-      const [f, r, b] = await Promise.all([
+      const [f, r, b, n] = await Promise.all([
         api.get('/friends/'),
         api.get('/friends/requests'),
-        api.get('/bills/')
+        api.get('/bills/'),
+        api.get('/notifications/'),
       ])
       
       const rawFriends = f.data;
       const rawBills = b.data;
+      const unreadNotifs = n.data.filter(notif => !notif.is_read);
+
+      // Build a set of friend usernames that have sent unread notifications
+      // We parse the first word of each notification message (always the sender's username)
+      const unreadFromUsernames = new Set(unreadNotifs.map(notif => notif.message.split(' ')[0].toLowerCase()));
       
       const activityMap = {};
       rawBills.forEach(bill => {
@@ -40,7 +46,8 @@ export default function FriendsPage() {
       const friendsWithSizing = rawFriends.map(fObj => {
         const count = activityMap[fObj.friend.id] || 0;
         const size = Math.min(220, 100 + (count * 15));
-        return { ...fObj, activityCount: count, bubbleSize: size };
+        const hasUnread = unreadFromUsernames.has((fObj.friend.username || '').toLowerCase());
+        return { ...fObj, activityCount: count, bubbleSize: size, hasUnread };
       });
       
       setFriends(friendsWithSizing)
@@ -104,16 +111,25 @@ export default function FriendsPage() {
         ) : (
           <div className={styles.grid}>
             {filtered.map((fObj) => {
-              const { friend, bubbleSize } = fObj;
+              const { friend, bubbleSize, hasUnread } = fObj;
               const fontSize = Math.max(14, bubbleSize * 0.22);
               return (
                 <Link key={friend.id} to={`/friends/${friend.id}`} style={{ textDecoration: 'none' }} className={styles.friendBubbleWrapper}>
-                  <div className={styles.friendCard} style={{ width: bubbleSize, height: bubbleSize }}>
-                    <div className={styles.cardTop}>
-                      <div className={styles.avatar} style={{ background: friend.avatar_color, fontSize }}>
-                        {initials(friend.full_name || friend.username)}
+                  <div style={{ position: 'relative' }}>
+                    <div className={styles.friendCard} style={{ width: bubbleSize, height: bubbleSize }}>
+                      <div className={styles.cardTop}>
+                        <div className={styles.avatar} style={{ background: friend.avatar_color, fontSize }}>
+                          {initials(friend.full_name || friend.username)}
+                        </div>
                       </div>
                     </div>
+                    {hasUnread && (
+                      <div style={{
+                        position: 'absolute', top: 4, right: 4,
+                        width: 12, height: 12, borderRadius: '50%',
+                        background: 'var(--red)', border: '2px solid var(--bg)'
+                      }} />
+                    )}
                   </div>
                   <div className={styles.info}>
                     <span className={styles.name}>{friend.full_name || friend.username}</span>

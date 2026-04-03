@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
-import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import AnimatedNumber from '../components/AnimatedNumber'
 import SkeletonCard from '../components/SkeletonCard'
@@ -38,6 +38,9 @@ export default function DashboardPage() {
   const [mergingId, setMergingId] = useState(null)
   // Show a warning banner instead of silently defaulting to zero on DB failure
   const [dbError, setDbError] = useState(null)
+  // Pending incoming payments (awaiting current user to accept) and unread notifications
+  const [pendingPayments, setPendingPayments] = useState([])
+  const [userNotifications, setUserNotifications] = useState([])
   // Track friend being paid
   const [payModalFriend, setPayModalFriend] = useState(null)
   const [payAmount, setPayAmount] = useState('')
@@ -54,11 +57,15 @@ export default function DashboardPage() {
       api.get('/bills/summary/balances'),
       api.get('/friends/'),
       api.get('/bills/'),
-    ]).then(([s, f, b]) => {
+      api.get('/payments/'),
+      api.get('/notifications/'),
+    ]).then(([s, f, b, p, n]) => {
       setDbError(null);
       setSummary(s.data); LS.set('summary', s.data);
       setFriends(f.data); LS.set('friends', f.data);
       setAllBills(b.data); LS.set('allBills', b.data);
+      setPendingPayments(p.data.filter(pay => pay.status === 'pending'));
+      setUserNotifications(n.data);
     }).catch(err => {
       console.error('Database connection failed:', err);
       setDbError('⚠️ Could not reach the database. Showing last known values — restart the backend server to reconnect.');
@@ -142,6 +149,22 @@ export default function DashboardPage() {
       toast.error(err.response?.data?.detail || 'Payment failed');
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const handleAcceptPayment = async (paymentId) => {
+    try {
+      await api.post(`/payments/${paymentId}/accept`);
+      // Auto-mark the related notification as read so the red dot disappears
+      try {
+        const { data: notifs } = await api.get('/notifications/');
+        const match = notifs.find(n => !n.is_read && n.reference_id === paymentId && n.type === 'payment');
+        if (match) await api.post(`/notifications/${match.id}/read`);
+      } catch (_) { /* non-critical — don't block the main action */ }
+      toast.success('Payment accepted! Balance updated.');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to accept payment');
     }
   };
 
@@ -254,12 +277,31 @@ export default function DashboardPage() {
               const canMerge = recv > 0 && give > 0;
               const isMerging = mergingId === friend.id;
               const hasBalance = recv > 0 || give > 0;
+              // Find any pending payment from this friend to the current user
+              const pendingFromFriend = pendingPayments.find(p => p.payer_id === friend.id);
+
+              // Find unread bill-type notifications from this friend
+              // (bill notifs: reference_id = bill.id, and that bill's creator is this friend)
+              const unreadBillNotif = userNotifications.find(n =>
+                !n.is_read && n.type === 'bill' &&
+                allBills.find(b => b.id === n.reference_id && b.creator?.id === friend.id)
+              );
+              const hasUnread = !!pendingFromFriend || !!unreadBillNotif;
 
               return (
                 <div key={friend.id} className={styles.friendRow}>
                   {/* Friend Identity */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                    <div className={styles.friendAvatar} style={{ background: friend.avatar_color }}>{initials(friend.full_name || friend.username)}</div>
+                    <div style={{ position: 'relative' }}>
+                      <div className={styles.friendAvatar} style={{ background: friend.avatar_color }}>{initials(friend.full_name || friend.username)}</div>
+                      {hasUnread && (
+                        <div style={{
+                          position: 'absolute', top: -2, right: -2,
+                          width: 10, height: 10, borderRadius: '50%',
+                          background: 'var(--red)', border: '2px solid var(--bg2)',
+                        }} />
+                      )}
+                    </div>
                     <div className={styles.friendInfo}>
                       <span className={styles.friendName}>{friend.full_name || friend.username}</span>
                       <span className={styles.friendHandle}>@{friend.username}</span>
@@ -292,8 +334,42 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Actions */}
-                    {(canMerge || give > 0) && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                    {(canMerge || give > 0 || pendingFromFriend || unreadBillNotif) && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {unreadBillNotif && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await api.post(`/notifications/${unreadBillNotif.id}/read`);
+                                loadData();
+                              } catch (_) {}
+                            }}
+                            className="glass"
+                            title="Mark bill notification as read"
+                            style={{
+                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
+                              background: 'rgba(0,255,194,0.15)', color: 'var(--primary)', border: '1px solid rgba(0,255,194,0.3)',
+                              cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px'
+                            }}
+                          >
+                            <CheckCircle size={13} /> Got it
+                          </button>
+                        )}
+                        {pendingFromFriend && (
+                          <button
+                            onClick={() => handleAcceptPayment(pendingFromFriend.id)}
+                            className="glass"
+                            title={`Accept payment of LKR ${pendingFromFriend.amount?.toFixed(2)}`}
+                            style={{
+                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
+                              background: 'linear-gradient(135deg, var(--green), #059669)',
+                              color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '700',
+                              display: 'flex', alignItems: 'center', gap: '4px'
+                            }}
+                          >
+                            <CheckCircle size={13} /> Accept LKR {parseFloat(pendingFromFriend.amount).toFixed(2)}
+                          </button>
+                        )}
                         {canMerge && (
                           <button
                             onClick={() => handleMerge(friend.id, recv, give)}
