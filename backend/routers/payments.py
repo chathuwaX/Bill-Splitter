@@ -7,6 +7,7 @@ from auth import get_current_user
 import models
 import schemas
 from typing import List
+from routers.friends import get_or_create_balance
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
@@ -83,6 +84,15 @@ def accept_payment(
     payment.status = models.PaymentStatus.accepted
     payment.accepted_at = datetime.utcnow()
 
+    # ── Update persistent balances ─────────────────────────
+    # payer.to_give -= amount
+    # payee.to_receive -= amount
+    payer_bal = get_or_create_balance(db, payment.payer_id, payment.payee_id)
+    payee_bal = get_or_create_balance(db, payment.payee_id, payment.payer_id)
+
+    payer_bal.to_give = max(0.0, round(float(payer_bal.to_give) - payment.amount, 2))
+    payee_bal.to_receive = max(0.0, round(float(payee_bal.to_receive) - payment.amount, 2))
+
     # Auto-settle the linked merged debt when payment is accepted
     if payment.debt_id:
         debt = db.query(models.Debt).filter(models.Debt.id == payment.debt_id).first()
@@ -97,6 +107,31 @@ def accept_payment(
     ))
     db.commit()
     return {"message": "Payment accepted"}
+
+
+@router.post("/{payment_id}/decline")
+def decline_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    payment = db.query(models.Payment).filter(
+        models.Payment.id == payment_id,
+        models.Payment.payee_id == current_user.id
+    ).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if payment.status != models.PaymentStatus.pending:
+        raise HTTPException(status_code=400, detail="Can only decline pending payments")
+
+    payment.status = models.PaymentStatus.declined
+    db.add(models.Notification(
+        user_id=payment.payer_id,
+        message=f"{current_user.username} declined your payment of LKR {payment.amount:.2f}",
+        type="payment", reference_id=payment_id
+    ))
+    db.commit()
+    return {"message": "Payment declined"}
 
 
 @router.get("/", response_model=List[schemas.PaymentOut])

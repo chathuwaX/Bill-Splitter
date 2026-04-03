@@ -23,6 +23,7 @@ class ParticipantStatus(str, enum.Enum):
 class PaymentStatus(str, enum.Enum):
     pending = "pending"
     accepted = "accepted"
+    declined = "declined"
 
 
 class DebtStatus(str, enum.Enum):
