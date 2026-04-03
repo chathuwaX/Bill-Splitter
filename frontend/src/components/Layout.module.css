@@ -176,3 +176,73 @@
   .header { padding: 0 12px; }
   .content { padding: 12px 10px; }
 }
+
+/* ── Floating Action Button ── */
+.fab {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 16px;
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+  cursor: pointer;
+  z-index: 1000;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fabIcon {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.fabText {
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 15px;
+  opacity: 0;
+  max-width: 0;
+  margin-left: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fab:hover {
+  width: 136px;
+  box-shadow: 0 12px 32px rgba(99,102,241,0.6);
+}
+
+.fab:hover .fabIcon {
+  transform: rotate(90deg);
+}
+
+.fab:hover .fabText {
+  opacity: 1;
+  max-width: 80px;
+  margin-left: 8px;
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .fab {
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    padding: 0 12px;
+  }
+  .fab:hover {
+    width: 128px;
+  }
+}

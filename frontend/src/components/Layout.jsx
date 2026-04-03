@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../api/client'
-import { LayoutDashboard, Users, Receipt, History, Bell, LogOut, Sun, Moon, Menu, X, Wallet } from 'lucide-react'
+import { LayoutDashboard, Users, Receipt, History, Bell, LogOut, Sun, Moon, Menu, X, Wallet, Plus } from 'lucide-react'
 import styles from './Layout.module.css'
 
 function formatRelativeTime(dateStr) {
@@ -163,6 +163,14 @@ export default function Layout() {
         </header>
         <main className={styles.content}><Outlet /></main>
       </div>
+      <button 
+        className={styles.fab} 
+        onClick={() => navigate('/bills?new=true')}
+        title="Create Bill"
+      >
+        <Plus size={24} className={styles.fabIcon} />
+        <span className={styles.fabText}>New Bill</span>
+      </button>
     </div>
   )
 }

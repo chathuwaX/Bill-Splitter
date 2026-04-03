@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
@@ -15,6 +16,14 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [expanded, setExpanded] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setShowCreate(true)
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
 
   const load = async () => {
     try { const r = await api.get('/bills/'); setBills(r.data) }
