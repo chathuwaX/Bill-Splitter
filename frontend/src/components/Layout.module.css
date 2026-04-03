@@ -12,7 +12,7 @@
 .logo {
   display: flex; align-items: center; gap: 10px;
   font-size: 20px; font-weight: 800; padding: 0 8px; margin-bottom: 32px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 
@@ -25,8 +25,8 @@
 }
 .navItem:hover { background: var(--card); color: var(--text); }
 .navItem.active {
-  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2));
-  color: var(--primary-light); border: 1px solid rgba(99,102,241,0.2);
+  background: linear-gradient(135deg, rgba(0,255,194,0.1), rgba(59,59,152,0.1));
+  color: var(--primary); border: 1px solid rgba(0,255,194,0.2);
 }
 
 .sidebarBottom {
@@ -185,15 +185,15 @@
   width: 56px;
   height: 56px;
   border-radius: 28px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: white;
+  background: var(--primary);
+  color: var(--bg);
   border: none;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 0 16px;
   box-sizing: border-box;
-  box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+  box-shadow: 0 8px 24px rgba(0,255,194,0.3);
   cursor: pointer;
   z-index: 1000;
   overflow: hidden;
@@ -217,7 +217,7 @@
 
 .fab:hover {
   width: 136px;
-  box-shadow: 0 12px 32px rgba(99,102,241,0.6);
+  box-shadow: 0 12px 32px rgba(0,255,194,0.5);
 }
 
 .fab:hover .fabIcon {
