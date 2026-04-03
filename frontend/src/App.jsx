@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import FriendsPage from './pages/FriendsPage'
+import FriendDetailPage from './pages/FriendDetailPage'
 import BillsPage from './pages/BillsPage'
 import HistoryPage from './pages/HistoryPage'
 
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
               <Route index element={<DashboardPage />} />
               <Route path="friends" element={<FriendsPage />} />
+              <Route path="friends/:friendId" element={<FriendDetailPage />} />
               <Route path="bills" element={<BillsPage />} />
               <Route path="history" element={<HistoryPage />} />
             </Route>
