@@ -47,10 +47,10 @@ export default function HistoryPage() {
   const filtered = tab === 'all'
     ? timeline
     : tab === 'bills'
-    ? timeline.filter(t => t.type === 'bill')
-    : tab === 'payments'
-    ? timeline.filter(t => t.type === 'payment')
-    : timeline.filter(t => t.type === 'merge')  // 'merged' tab
+      ? timeline.filter(t => t.type === 'bill')
+      : tab === 'payments'
+        ? timeline.filter(t => t.type === 'payment')
+        : timeline.filter(t => t.type === 'merge')  // 'merged' tab
 
   const pendingPayments = payments.filter(p => p.payee_id === user.id && p.status === 'pending')
 
@@ -58,96 +58,99 @@ export default function HistoryPage() {
 
   const todayStr = new Date().toLocaleDateString();
   const recentFiltered = filtered.filter(t => t.date.toLocaleDateString() === todayStr);
-  const olderFiltered  = filtered.filter(t => t.date.toLocaleDateString() !== todayStr);
+  const olderFiltered = filtered.filter(t => t.date.toLocaleDateString() !== todayStr);
 
   return (
-    <div className={`${styles.page} fade-in`}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>History</h1>
-          <p className={styles.subtitle}>{timeline.length} transactions</p>
+    <>
+      <div className={`${styles.page} fade-in`}>
+        <div className={styles.header}>
+          <div>
+            <h1 className={styles.title}>History</h1>
+            <p className={styles.subtitle}>{timeline.length} transactions</p>
+          </div>
         </div>
-      </div>
 
-      {pendingPayments.length > 0 && (
-        <div className={`${styles.pendingSection} glass`}>
-          <h3 className={styles.sectionLabel}>Pending Payments to Accept</h3>
-          {pendingPayments.map(p => (
-            <div key={p.id} className={styles.pendingRow}>
-              <div className={styles.pendingIcon}><ArrowDownLeft size={16} color="#10b981" /></div>
-              <div className={styles.pendingInfo}>
-                <span>{p.payer.username} sent you LKR {p.amount.toFixed(2)}</span>
-                {p.note && <span className={styles.note}>{p.note}</span>}
+        {pendingPayments.length > 0 && (
+          <div className={`${styles.pendingSection} glass`}>
+            <h3 className={styles.sectionLabel}>Pending Payments to Accept</h3>
+            {pendingPayments.map(p => (
+              <div key={p.id} className={styles.pendingRow}>
+                <div className={styles.pendingIcon}><ArrowDownLeft size={16} color="#10b981" /></div>
+                <div className={styles.pendingInfo}>
+                  <span>{p.payer.username} sent you LKR {p.amount.toFixed(2)}</span>
+                  {p.note && <span className={styles.note}>{p.note}</span>}
+                </div>
+                <button className="btn btn-success" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => acceptPayment(p.id)}>
+                  <Check size={13} /> Accept
+                </button>
               </div>
-              <button className="btn btn-success" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => acceptPayment(p.id)}>
-                <Check size={13} /> Accept
-              </button>
-            </div>
+            ))}
+          </div>
+        )}
+
+        <div className={styles.tabs}>
+          {tabs.map(t => (
+            <button key={t} className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`} onClick={() => setTab(t)}>
+              {t === 'merged' ? <><GitMerge size={12} /> Merged</> : t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
           ))}
         </div>
-      )}
 
-      <div className={styles.tabs}>
-        {tabs.map(t => (
-          <button key={t} className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`} onClick={() => setTab(t)}>
-            {t === 'merged' ? <><GitMerge size={12} /> Merged</> : t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{[1,2,3,4].map(i => <SkeletonCard key={i} height={80} />)}</div>
-      ) : filtered.length === 0 ? (
-        <div className={styles.empty}>
-          <History size={48} opacity={0.2} />
-          <p>No {tab === 'all' ? '' : tab} transactions yet</p>
-          <p className={styles.emptyHint}>
-            {tab === 'merged' ? 'Merge debts from the Friends page to see them here' : 'Your bills and payments will appear here'}
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {recentFiltered.length > 0 && (
-            <div className={`glass`} style={{ padding: '16px', borderRadius: '12px' }}>
-              <div className={styles.sectionTitle} style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.95rem' }}>
-                <History size={16} /> Recent History (Today)
-              </div>
-              <div className={styles.timeline}>
-                {recentFiltered.map(item => (
-                  <TimelineItem
-                    key={`recent-${item.type}-${item.data.id}`}
-                    item={item}
-                    userId={user.id}
-                    onAcceptPayment={acceptPayment}
-                    onViewMerge={setViewDebt}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {olderFiltered.length > 0 && (
-            <div>
-              {recentFiltered.length > 0 && (
-                <div className={styles.sectionTitle} style={{ marginBottom: '12px', marginLeft: '4px', fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-                  Older
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{[1, 2, 3, 4].map(i => <SkeletonCard key={i} height={80} />)}</div>
+        ) : filtered.length === 0 ? (
+          <div className={styles.empty}>
+            <History size={48} opacity={0.2} />
+            <p>No {tab === 'all' ? '' : tab} transactions yet</p>
+            <p className={styles.emptyHint}>
+              {tab === 'merged' ? 'Merge debts from the Friends page to see them here' : 'Your bills and payments will appear here'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {recentFiltered.length > 0 && (
+              <div className={`glass`} style={{ padding: '16px', borderRadius: '12px' }}>
+                <div className={styles.sectionTitle} style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.95rem' }}>
+                  <History size={16} /> Recent History (Today)
                 </div>
-              )}
-              <div className={styles.timeline}>
-                {olderFiltered.map(item => (
-                  <TimelineItem
-                    key={`older-${item.type}-${item.data.id}`}
-                    item={item}
-                    userId={user.id}
-                    onAcceptPayment={acceptPayment}
-                    onViewMerge={setViewDebt}
-                  />
-                ))}
+                <div className={styles.timeline}>
+                  {recentFiltered.map(item => (
+                    <TimelineItem
+                      key={`recent-${item.type}-${item.data.id}`}
+                      item={item}
+                      userId={user.id}
+                      onAcceptPayment={acceptPayment}
+                      onViewMerge={setViewDebt}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+
+            {olderFiltered.length > 0 && (
+              <div>
+                {recentFiltered.length > 0 && (
+                  <div className={styles.sectionTitle} style={{ marginBottom: '12px', marginLeft: '4px', fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                    Older
+                  </div>
+                )}
+                <div className={styles.timeline}>
+                  {olderFiltered.map(item => (
+                    <TimelineItem
+                      key={`older-${item.type}-${item.data.id}`}
+                      item={item}
+                      userId={user.id}
+                      onAcceptPayment={acceptPayment}
+                      onViewMerge={setViewDebt}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
 
       {viewDebt && (
         <MergeDetailsModal
@@ -157,7 +160,7 @@ export default function HistoryPage() {
           onSettled={load}
         />
       )}
-    </div>
+    </>
   )
 }
 

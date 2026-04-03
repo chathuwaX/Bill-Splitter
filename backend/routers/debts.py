@@ -129,7 +129,21 @@ def merge_debts(
         friend_rec.to_give    = 0.0
         direction = "settled"
 
-    # ── Create Debt record for History ────────────────────────────────────────
+    # ── Gather sources & Create Debt record for History ───────────────────────
+    merge_uuid = str(uuid.uuid4())
+    
+    participants_to_merge = db.query(models.BillParticipant).join(models.Bill).filter(
+        models.BillParticipant.is_merged == False,
+        or_(
+            and_(models.Bill.creator_id == current_user.id, models.BillParticipant.user_id == friend_id),
+            and_(models.Bill.creator_id == friend_id, models.BillParticipant.user_id == current_user.id)
+        )
+    ).all()
+    
+    for p in participants_to_merge:
+        p.is_merged = True
+        p.merge_group_id = merge_uuid
+
     desc_dir = "You Owe" if direction == "you_owe_friend" else "They Owe"
     if direction == "settled":
         description = f"Merged debts with {friend.username} — Settled"
@@ -146,7 +160,8 @@ def merge_debts(
         net_amount=remainder,
         description=description,
         status=models.DebtStatus.active if remainder > 0 else models.DebtStatus.settled,
-        is_merged=False
+        is_merged=False,
+        merge_group_id=merge_uuid
     )
     db.add(debt)
 
@@ -222,6 +237,9 @@ def get_debt_sources(
         raise HTTPException(status_code=404, detail="Debt not found")
     if current_user.id not in (debt.from_user_id, debt.to_user_id):
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    if not debt.merge_group_id:
+        return []
 
     participants = (
         db.query(models.BillParticipant)

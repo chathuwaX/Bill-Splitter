@@ -30,7 +30,7 @@ export default function MergeDetailsModal({ debt, currentUserId, onClose, onSett
         note: `Settling merged debt #${debt.id}`,
         debt_id: debt.id,
       })
-      toast.success('Payment sent — waiting for acceptance')
+      toast.success('Debt settled!')
       onSettled?.()
       onClose()
     } catch (err) {
@@ -41,7 +41,7 @@ export default function MergeDetailsModal({ debt, currentUserId, onClose, onSett
   }
 
   return (
-    <Modal title="Merge Details" onClose={onClose} wide>
+    <Modal title="Merge Details" onClose={onClose} wide top={15}>
       <div className={styles.wrap}>
 
         {/* Net balance card */}

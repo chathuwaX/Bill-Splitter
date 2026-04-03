@@ -24,12 +24,14 @@ def create_payment(
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
     # Validate linked debt if provided
+    is_auto_accept = False
     if data.debt_id:
         debt = db.query(models.Debt).filter(models.Debt.id == data.debt_id).first()
         if not debt:
             raise HTTPException(status_code=404, detail="Linked debt not found")
         if debt.status == models.DebtStatus.settled:
             raise HTTPException(status_code=400, detail="This debt is already settled")
+        is_auto_accept = True
 
     payment = models.Payment(
         payer_id=current_user.id,
@@ -37,14 +39,27 @@ def create_payment(
         amount=data.amount,
         note=data.note,
         debt_id=data.debt_id,
+        status=models.PaymentStatus.accepted if is_auto_accept else models.PaymentStatus.pending,
+        accepted_at=datetime.utcnow() if is_auto_accept else None
     )
     db.add(payment)
     db.flush()
-    db.add(models.Notification(
-        user_id=data.payee_id,
-        message=f"{current_user.username} sent you LKR {data.amount:.2f} — awaiting your acceptance",
-        type="payment", reference_id=payment.id
-    ))
+    
+    if is_auto_accept:
+        debt.status = models.DebtStatus.settled
+        debt.settled_at = datetime.utcnow()
+        db.add(models.Notification(
+            user_id=data.payee_id,
+            message=f"{current_user.username} settled the merged debt of LKR {data.amount:.2f}",
+            type="payment", reference_id=payment.id
+        ))
+    else:
+        db.add(models.Notification(
+            user_id=data.payee_id,
+            message=f"{current_user.username} sent you LKR {data.amount:.2f} — awaiting your acceptance",
+            type="payment", reference_id=payment.id
+        ))
+        
     db.commit()
     db.refresh(payment)
     return payment
