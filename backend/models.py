@@ -157,3 +157,27 @@ class Debt(Base):
     from_user = relationship("User", foreign_keys=[from_user_id], back_populates="debts_as_from")
     to_user = relationship("User", foreign_keys=[to_user_id], back_populates="debts_as_to")
     payments = relationship("Payment", back_populates="debt")
+
+
+class FriendBalance(Base):
+    """
+    Persistent balance register — one row per (user_id, friend_id) direction.
+
+    Updated by:
+      - Bill creation  → debtor's to_give   increases immediately
+      - Bill acceptance → creditor's to_receive increases when debtor accepts
+      - Merge          → SQL UPDATE sets remainder in winner column, loser → 0
+
+    Both perspectives are stored as separate rows so each user can read their
+    own balances with a simple WHERE user_id = ? query.
+
+    Values are always >= 0 (ABS guaranteed at write time).
+    """
+    __tablename__ = "friend_balances"
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    friend_id  = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    to_receive = Column(Float, default=0.0, nullable=False)   # friend owes me
+    to_give    = Column(Float, default=0.0, nullable=False)   # I owe friend
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+

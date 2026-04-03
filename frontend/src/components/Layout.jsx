@@ -1,10 +1,25 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../api/client'
 import { LayoutDashboard, Users, Receipt, History, Bell, LogOut, Sun, Moon, Menu, X, Wallet } from 'lucide-react'
 import styles from './Layout.module.css'
+
+function formatRelativeTime(dateStr) {
+  const now = new Date()
+  const d = new Date(dateStr)
+  const diffMs = now - d
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'Just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay === 1) return 'Yesterday'
+  if (diffDay < 7) return `${diffDay}d ago`
+  return d.toLocaleDateString()
+}
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -13,12 +28,25 @@ export default function Layout() {
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const notifRef = useRef(null)
 
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    if (!showNotifs) return
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifs(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNotifs])
 
   const fetchNotifications = async () => {
     try { const r = await api.get('/notifications/'); setNotifications(r.data) } catch {}
@@ -100,7 +128,7 @@ export default function Layout() {
             <button className={styles.iconBtn} onClick={toggle} title="Toggle theme">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <div className={styles.notifWrapper}>
+            <div className={styles.notifWrapper} ref={notifRef}>
               <button className={styles.iconBtn} onClick={() => setShowNotifs(o => !o)}>
                 <Bell size={18} />
                 {unreadCount > 0 && <span className={styles.badge}>{unreadCount}</span>}
@@ -123,7 +151,7 @@ export default function Layout() {
                         <div className={`${styles.notifDot} ${styles[`dot_${n.type}`]}`} />
                         <div>
                           <p className={styles.notifMsg}>{n.message}</p>
-                          <p className={styles.notifTime}>{new Date(n.created_at).toLocaleDateString()}</p>
+                          <p className={styles.notifTime}>{formatRelativeTime(n.created_at)}</p>
                         </div>
                       </div>
                     ))}

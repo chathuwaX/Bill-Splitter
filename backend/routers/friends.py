@@ -10,37 +10,88 @@ from typing import List
 router = APIRouter(prefix="/api/v1/friends", tags=["friends"])
 
 
-def calc_net_balance(db: Session, user_id: int, friend_id: int) -> float:
-    """Positive = friend owes user. Negative = user owes friend."""
-    friend_owes = 0.0
-    user_owes = 0.0
+# ── FriendBalance helpers ─────────────────────────────────────────────────────
 
+def get_or_create_balance(
+    db: Session, user_id: int, friend_id: int
+) -> models.FriendBalance:
+    """
+    Return the FriendBalance row for (user_id, friend_id).
+
+    If no row exists yet (e.g. data pre-dates this schema), bootstrap the
+    values from BillParticipant and Debt records so the first read is accurate,
+    then persist the row so all future reads are O(1) direct selects.
+    """
+    rec = (
+        db.query(models.FriendBalance)
+        .filter(
+            models.FriendBalance.user_id   == user_id,
+            models.FriendBalance.friend_id == friend_id,
+        )
+        .first()
+    )
+    if rec is None:
+        # ── Bootstrap from existing relational data ───────────────────────────
+        bal = _compute_from_relations(db, user_id, friend_id)
+        rec = models.FriendBalance(
+            user_id=user_id,
+            friend_id=friend_id,
+            to_receive=bal["to_receive"],
+            to_give=bal["to_give"],
+        )
+        db.add(rec)
+        db.flush()   # assign id without committing yet
+    return rec
+
+
+def _compute_from_relations(db: Session, user_id: int, friend_id: int) -> dict:
+    """
+    One-time bootstrap: compute balances from BillParticipant + Debt rows.
+    Only called when no FriendBalance row exists for this pair.
+    After bootstrap the explicit row is the source of truth.
+    """
+    # to_receive: accepted bills I created where friend is participant (unmerged)
+    to_receive = 0.0
     for bill in db.query(models.Bill).filter(models.Bill.creator_id == user_id).all():
         for p in bill.participants:
-            if p.user_id == friend_id and not p.is_creator:
-                friend_owes += p.amount_owed
+            if (
+                p.user_id == friend_id
+                and not p.is_creator
+                and not p.is_merged
+            ):
+                to_receive += float(p.amount_owed)
 
+    # to_give: unmerged bills friend created where I am participant
+    to_give = 0.0
     for bill in db.query(models.Bill).filter(models.Bill.creator_id == friend_id).all():
         for p in bill.participants:
-            if p.user_id == user_id and not p.is_creator:
-                user_owes += p.amount_owed
+            if (p.user_id == user_id and not p.is_creator and not p.is_merged):
+                to_give += float(p.amount_owed)
 
-    for p in db.query(models.Payment).filter(
-        models.Payment.payer_id == user_id,
-        models.Payment.payee_id == friend_id,
-        models.Payment.status == models.PaymentStatus.accepted
+    # Include any existing active Debt records (from old-style merges)
+    for debt in db.query(models.Debt).filter(
+        models.Debt.from_user_id == friend_id,
+        models.Debt.to_user_id   == user_id,
+        models.Debt.status       == models.DebtStatus.active,
+        models.Debt.is_merged    == False,
     ).all():
-        user_owes -= p.amount
+        to_receive += float(debt.net_amount)
 
-    for p in db.query(models.Payment).filter(
-        models.Payment.payer_id == friend_id,
-        models.Payment.payee_id == user_id,
-        models.Payment.status == models.PaymentStatus.accepted
+    for debt in db.query(models.Debt).filter(
+        models.Debt.from_user_id == user_id,
+        models.Debt.to_user_id   == friend_id,
+        models.Debt.status       == models.DebtStatus.active,
+        models.Debt.is_merged    == False,
     ).all():
-        friend_owes -= p.amount
+        to_give += float(debt.net_amount)
 
-    return round(friend_owes - user_owes, 2)
+    return {
+        "to_receive": max(0.0, round(to_receive, 2)),
+        "to_give":    max(0.0, round(to_give,    2)),
+    }
 
+
+# ── Friend request endpoints ──────────────────────────────────────────────────
 
 @router.post("/request")
 def send_friend_request(
@@ -127,6 +178,13 @@ def get_friends(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Return all accepted friends with their persistent FriendBalance values.
+
+    Uses the friend_balances table as the source of truth.
+    On first access for any pair, bootstraps from BillParticipant / Debt rows
+    so that data created before this schema is not lost.
+    """
     friendships = db.query(models.Friendship).filter(
         or_(
             models.Friendship.requester_id == current_user.id,
@@ -136,10 +194,29 @@ def get_friends(
     ).all()
 
     result = []
+    needs_commit = False
+
     for f in friendships:
         friend = f.addressee if f.requester_id == current_user.id else f.requester
-        net = calc_net_balance(db, current_user.id, friend.id)
-        result.append(schemas.FriendBalance(friend=friend, net_balance=net))
+
+        # get_or_create_balance will INSERT a new row if needed (bootstrap)
+        rec = get_or_create_balance(db, current_user.id, friend.id)
+        if not rec.id:
+            needs_commit = True   # new row was flushed but not committed yet
+
+        to_receive = max(0.0, round(float(rec.to_receive), 2))
+        to_give    = max(0.0, round(float(rec.to_give),    2))
+
+        result.append(schemas.FriendBalance(
+            friend=friend,
+            to_receive=to_receive,
+            to_give=to_give,
+            net_balance=round(to_receive - to_give, 2),
+        ))
+
+    if needs_commit:
+        db.commit()   # persist all bootstrapped rows in one shot
+
     return result
 
 

@@ -124,7 +124,9 @@ class BalanceSummary(BaseModel):
 
 class FriendBalance(BaseModel):
     friend: UserOut
-    net_balance: float
+    to_receive: float   # creditor side — accepted bills where friend owes me
+    to_give: float      # debtor side   — bills where I owe the friend (any status)
+    net_balance: float  # to_receive - to_give (kept for backward compatibility)
 
 
 # ── Debt / Merge schemas ──────────────────────────────────────────────────────

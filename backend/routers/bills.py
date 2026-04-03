@@ -5,6 +5,7 @@ from auth import get_current_user
 import models
 import schemas
 from typing import List
+from routers.friends import get_or_create_balance
 
 router = APIRouter(prefix="/api/v1/bills", tags=["bills"])
 
@@ -15,6 +16,13 @@ def create_bill(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Create a bill and immediately update FriendBalance for every debtor.
+
+    Debtor's to_give increases as soon as the bill is created.
+    Creator's to_receive is updated separately when the debtor ACCEPTS
+    (see accept_bill below) — matching the acceptance-gated display rule.
+    """
     all_ids = list(set(bill_data.participant_ids + [current_user.id]))
     total = bill_data.total_amount
 
@@ -35,21 +43,40 @@ def create_bill(
     db.add(bill)
     db.flush()
 
+    # Pre-fetch balances to avoid double-counting due to implicit flushes 
+    # inside get_or_create_balance when adding participants.
+    for uid in all_ids:
+        if uid != current_user.id:
+            get_or_create_balance(db, uid, current_user.id)
+            get_or_create_balance(db, current_user.id, uid)
+
     for uid in all_ids:
         is_creator = uid == current_user.id
+        share = float(split_map.get(uid, round(total / len(all_ids), 2)))
+
         db.add(models.BillParticipant(
             bill_id=bill.id,
             user_id=uid,
-            amount_owed=split_map.get(uid, round(total / len(all_ids), 2)),
+            amount_owed=share,
             status=models.ParticipantStatus.accepted if is_creator else models.ParticipantStatus.pending,
             is_creator=is_creator,
         ))
+
         if not is_creator:
             db.add(models.Notification(
                 user_id=uid,
-                message=f"{current_user.username} added you to '{bill_data.title}' — LKR {split_map.get(uid, 0):.2f}",
+                message=f"{current_user.username} added you to '{bill_data.title}' — LKR {share:.2f}",
                 type="bill", reference_id=bill.id
             ))
+
+            # ── Persistent balance update ───────────────────────
+            # The debtor owes from the moment the bill is created.
+            # Both ends of the balance are updated immediately.
+            debtor_rec = get_or_create_balance(db, uid, current_user.id)
+            debtor_rec.to_give = max(0.0, round(float(debtor_rec.to_give) + share, 2))
+            
+            creator_rec = get_or_create_balance(db, current_user.id, uid)
+            creator_rec.to_receive = max(0.0, round(float(creator_rec.to_receive) + share, 2))
 
     db.commit()
     db.refresh(bill)
@@ -74,33 +101,19 @@ def get_balance_summary(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    total_owed = sum(
-        p.amount_owed
-        for bill in db.query(models.Bill).filter(models.Bill.creator_id == current_user.id).all()
-        for p in bill.participants if not p.is_creator
-    )
-    total_owe = sum(
-        p.amount_owed
-        for p in db.query(models.BillParticipant).filter(
-            models.BillParticipant.user_id == current_user.id,
-            models.BillParticipant.is_creator == False
-        ).all()
-    )
+    """
+    Dashboard totals — reads directly from the friend_balances table.
 
-    for p in db.query(models.Payment).filter(
-        models.Payment.payer_id == current_user.id,
-        models.Payment.status == models.PaymentStatus.accepted
-    ).all():
-        total_owe -= p.amount
+    Since every bill creation, acceptance, and merge writes to this table,
+    the totals here always reflect the current DB state and never reset to zero.
+    """
+    recs = db.query(models.FriendBalance).filter(
+        models.FriendBalance.user_id == current_user.id
+    ).all()
 
-    for p in db.query(models.Payment).filter(
-        models.Payment.payee_id == current_user.id,
-        models.Payment.status == models.PaymentStatus.accepted
-    ).all():
-        total_owed -= p.amount
+    total_owed = max(0.0, round(sum(float(r.to_receive) for r in recs), 2))
+    total_owe  = max(0.0, round(sum(float(r.to_give)    for r in recs), 2))
 
-    total_owed = max(0, round(total_owed, 2))
-    total_owe = max(0, round(total_owe, 2))
     return schemas.BalanceSummary(
         total_owed=total_owed,
         total_owe=total_owe,
@@ -128,15 +141,26 @@ def accept_bill(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Accept a bill.
+    Updates the creator's FriendBalance.to_receive to reflect the accepted amount.
+    The debtor's to_give was already set at bill creation — no change needed there.
+    """
     participant = db.query(models.BillParticipant).filter(
         models.BillParticipant.bill_id == bill_id,
         models.BillParticipant.user_id == current_user.id
     ).first()
     if not participant:
         raise HTTPException(status_code=404, detail="Not a participant")
+    if participant.status == models.ParticipantStatus.accepted:
+        return {"message": "Already accepted"}
 
     participant.status = models.ParticipantStatus.accepted
+
     bill = db.query(models.Bill).filter(models.Bill.id == bill_id).first()
+
+    # The balances were already updated when the bill was created.
+    # We only need to notify the creator that the bill was accepted.
     db.add(models.Notification(
         user_id=bill.creator_id,
         message=f"{current_user.username} accepted the bill '{bill.title}'",

@@ -32,78 +32,80 @@ export default function BillsPage() {
   const myStatus = bill => bill.participants.find(p => p.user_id === user.id)?.status
 
   return (
-    <div className={`${styles.page} fade-in`}>
-      <div className={styles.header}>
-        <div><h1 className={styles.title}>Bills</h1><p className={styles.subtitle}>{bills.length} total bills</p></div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={16} /> Create Bill</button>
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{[1,2,3].map(i => <SkeletonCard key={i} height={100} />)}</div>
-      ) : bills.length === 0 ? (
-        <div className={styles.empty}>
-          <Receipt size={56} opacity={0.2} />
-          <p>No bills yet</p>
-          <p className={styles.emptyHint}>Create your first bill to start splitting expenses</p>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} /> Create Bill</button>
+    <>
+      <div className={`${styles.page} fade-in`}>
+        <div className={styles.header}>
+          <div><h1 className={styles.title}>Bills</h1><p className={styles.subtitle}>{bills.length} total bills</p></div>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={16} /> Create Bill</button>
         </div>
-      ) : (
-        <div className={styles.list}>
-          {bills.map(bill => {
-            const status = myStatus(bill)
-            const isCreator = bill.creator_id === user.id
-            const myShare = bill.participants.find(p => p.user_id === user.id)?.amount_owed ?? 0
-            const isOpen = expanded === bill.id
-            return (
-              <div key={bill.id} className={`${styles.billCard} glass`}>
-                <div className={styles.billMain} onClick={() => setExpanded(isOpen ? null : bill.id)}>
-                  <div className={styles.billIcon}><Receipt size={18} color="#6366f1" /></div>
-                  <div className={styles.billInfo}>
-                    <div className={styles.billTitleRow}>
-                      <span className={styles.billTitle}>{bill.title}</span>
-                      <div className={styles.badges}>
-                        {isCreator && <span className="badge badge-info">Creator</span>}
-                        <span className={`badge ${status === 'accepted' ? 'badge-accepted' : 'badge-pending'}`}>{status}</span>
+
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{[1,2,3].map(i => <SkeletonCard key={i} height={100} />)}</div>
+        ) : bills.length === 0 ? (
+          <div className={styles.empty}>
+            <Receipt size={56} opacity={0.2} />
+            <p>No bills yet</p>
+            <p className={styles.emptyHint}>Create your first bill to start splitting expenses</p>
+            <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} /> Create Bill</button>
+          </div>
+        ) : (
+          <div className={styles.list}>
+            {bills.map(bill => {
+              const status = myStatus(bill)
+              const isCreator = bill.creator_id === user.id
+              const myShare = bill.participants.find(p => p.user_id === user.id)?.amount_owed ?? 0
+              const isOpen = expanded === bill.id
+              return (
+                <div key={bill.id} className={`${styles.billCard} glass`}>
+                  <div className={styles.billMain} onClick={() => setExpanded(isOpen ? null : bill.id)}>
+                    <div className={styles.billIcon}><Receipt size={18} color="#6366f1" /></div>
+                    <div className={styles.billInfo}>
+                      <div className={styles.billTitleRow}>
+                        <span className={styles.billTitle}>{bill.title}</span>
+                        <div className={styles.badges}>
+                          {isCreator && <span className="badge badge-info">Creator</span>}
+                          <span className={`badge ${status === 'accepted' ? 'badge-accepted' : 'badge-pending'}`}>{status}</span>
+                        </div>
+                      </div>
+                      {bill.description && <p className={styles.billDesc}>{bill.description}</p>}
+                      <div className={styles.billMeta}>
+                        <span><Users size={12} /> {bill.participants.length} people</span>
+                        <span>{new Date(bill.created_at).toLocaleDateString()}</span>
+                        <span>Your share: <strong>LKR {myShare.toFixed(2)}</strong></span>
                       </div>
                     </div>
-                    {bill.description && <p className={styles.billDesc}>{bill.description}</p>}
-                    <div className={styles.billMeta}>
-                      <span><Users size={12} /> {bill.participants.length} people</span>
-                      <span>{new Date(bill.created_at).toLocaleDateString()}</span>
-                      <span>Your share: <strong>LKR {myShare.toFixed(2)}</strong></span>
+                    <div className={styles.billRight}>
+                      <div className={styles.billTotal}>LKR {bill.total_amount.toFixed(2)}</div>
+                      {isOpen ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
                     </div>
                   </div>
-                  <div className={styles.billRight}>
-                    <div className={styles.billTotal}>LKR {bill.total_amount.toFixed(2)}</div>
-                    {isOpen ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
-                  </div>
+                  {isOpen && (
+                    <div className={styles.billDetails}>
+                      <div className={styles.participantList}>
+                        {bill.participants.map(p => (
+                          <div key={p.id} className={styles.participantRow}>
+                            <div className={styles.pAvatar} style={{ background: p.user.avatar_color }}>{initials(p.user.full_name || p.user.username)}</div>
+                            <div className={styles.pInfo}><span>{p.user.full_name || p.user.username}</span>{p.is_creator && <span className={styles.pCreator}>paid</span>}</div>
+                            <div className={styles.pAmount}>LKR {p.amount_owed.toFixed(2)}</div>
+                            <span className={`badge ${p.status === 'accepted' ? 'badge-accepted' : 'badge-pending'}`}>{p.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {!isCreator && status === 'pending' && (
+                        <button className="btn btn-success" onClick={() => acceptBill(bill.id)} style={{ alignSelf: 'flex-start' }}>
+                          <Check size={14} /> Accept Bill
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {isOpen && (
-                  <div className={styles.billDetails}>
-                    <div className={styles.participantList}>
-                      {bill.participants.map(p => (
-                        <div key={p.id} className={styles.participantRow}>
-                          <div className={styles.pAvatar} style={{ background: p.user.avatar_color }}>{initials(p.user.full_name || p.user.username)}</div>
-                          <div className={styles.pInfo}><span>{p.user.full_name || p.user.username}</span>{p.is_creator && <span className={styles.pCreator}>paid</span>}</div>
-                          <div className={styles.pAmount}>LKR {p.amount_owed.toFixed(2)}</div>
-                          <span className={`badge ${p.status === 'accepted' ? 'badge-accepted' : 'badge-pending'}`}>{p.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {!isCreator && status === 'pending' && (
-                      <button className="btn btn-success" onClick={() => acceptBill(bill.id)} style={{ alignSelf: 'flex-start' }}>
-                        <Check size={14} /> Accept Bill
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+      </div>
       {showCreate && <CreateBillModal onClose={() => setShowCreate(false)} onCreated={load} />}
-    </div>
+    </>
   )
 }
 

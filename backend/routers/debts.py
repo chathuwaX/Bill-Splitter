@@ -2,23 +2,22 @@
 Debt Merging (Netting) Router
 ─────────────────────────────
 POST /api/v1/debts/merge/{friend_id}
-  - Fetches all active, unmerged bill-participant entries between the two users
-  - Separates by direction, calculates net amount
-  - Marks originals as is_merged=True with a shared merge_group_id
-  - Creates a single Debt record representing the net result
-  - Returns full merge details for the frontend
+  PRIMARY: Reads to_receive / to_give from friend_balances table (source of truth).
+  Calculates remainder = ABS(to_receive - to_give).
+  SQL UPDATE: sets the larger column to remainder, smaller column to 0.
+  Both the caller's row AND the friend's mirrored row are updated atomically.
 
 GET /api/v1/debts/
-  - Returns all active merged debts involving the current user
+  Returns all active merged debts involving the current user.
 
 GET /api/v1/debts/{debt_id}
-  - Returns a single debt with its source items
+  Returns a single debt with its source items.
 
 GET /api/v1/debts/{debt_id}/sources
-  - Returns the original BillParticipant entries that were merged
+  Returns the original BillParticipant entries that were merged.
 
 POST /api/v1/debts/{debt_id}/settle
-  - Marks a debt as settled (called after payment is accepted)
+  Marks a debt as settled (called after payment is accepted).
 """
 
 import uuid
@@ -31,74 +30,49 @@ from auth import get_current_user
 import models
 import schemas
 from typing import List
+from routers.friends import get_or_create_balance
 
 router = APIRouter(prefix="/api/v1/debts", tags=["debts"])
 
 
-def _get_unmerged_participants(db: Session, user_id: int, friend_id: int):
-    """
-    Return all BillParticipant rows that represent an active, unmerged debt
-    between user_id and friend_id.
-
-    A 'debt' from A to B exists when:
-      - Bill was created by A, and B is a non-creator participant (B owes A)
-      - Bill was created by B, and A is a non-creator participant (A owes B)
-    """
-    # Bills created by user where friend is a non-creator participant
-    user_created = (
-        db.query(models.BillParticipant)
-        .join(models.Bill, models.Bill.id == models.BillParticipant.bill_id)
-        .filter(
-            models.Bill.creator_id == user_id,
-            models.BillParticipant.user_id == friend_id,
-            models.BillParticipant.is_creator == False,
-            models.BillParticipant.is_merged == False,
-        )
-        .all()
-    )
-
-    # Bills created by friend where user is a non-creator participant
-    friend_created = (
-        db.query(models.BillParticipant)
-        .join(models.Bill, models.Bill.id == models.BillParticipant.bill_id)
-        .filter(
-            models.Bill.creator_id == friend_id,
-            models.BillParticipant.user_id == user_id,
-            models.BillParticipant.is_creator == False,
-            models.BillParticipant.is_merged == False,
-        )
-        .all()
-    )
-
-    return user_created, friend_created
-
-
-@router.post("/merge/{friend_id}", response_model=schemas.MergeResult)
+@router.post("/merge/{friend_id}")
 def merge_debts(
     friend_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """
-    Merge all active, unmerged debts between current_user and friend into
-    a single net Debt record.
+    Merge the balances between current_user and friend.
 
-    Direction semantics:
-      friend_owes_user  = bills created by current_user, friend is participant
-      user_owes_friend  = bills created by friend, current_user is participant
+    Reads directly from the friend_balances table (source of truth) so the
+    calculation always uses the same values that the Dashboard displays.
 
-    Net = friend_owes_user_total - user_owes_friend_total
-      Positive → friend owes current_user  (from=friend, to=current_user)
-      Negative → current_user owes friend  (from=current_user, to=friend)
-      Zero     → fully settled, no debt record needed
+    SQL UPDATE logic:
+      remainder = ABS(to_receive - to_give)
+
+      If to_receive > to_give:
+        my_row.to_receive  = remainder   (I am still owed the difference)
+        my_row.to_give     = 0
+        friend_row.to_give = remainder   (friend still owes the difference)
+        friend_row.to_receive = 0
+
+      If to_give > to_receive:
+        my_row.to_give        = remainder (I still owe the difference)
+        my_row.to_receive     = 0
+        friend_row.to_receive = remainder (friend is still owed the difference)
+        friend_row.to_give    = 0
+
+      If equal: all four columns → 0 (fully settled)
+
+    Values are always stored as positive floats — never negative.
     """
+    # ── Validate friend ───────────────────────────────────────────────────────
     friend = db.query(models.User).filter(models.User.id == friend_id).first()
     if not friend:
         raise HTTPException(status_code=404, detail="Friend not found")
     if friend_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot merge debts with yourself")
 
-    # Verify friendship
     friendship = db.query(models.Friendship).filter(
         or_(
             and_(
@@ -115,131 +89,91 @@ def merge_debts(
     if not friendship:
         raise HTTPException(status_code=400, detail="Not friends with this user")
 
-    # Fetch unmerged participants in both directions
-    friend_owes_entries, user_owes_entries = _get_unmerged_participants(
-        db, current_user.id, friend_id
-    )
+    # ── Read current balances from friend_balances table ─────────────────────
+    # get_or_create_balance bootstraps from BillParticipants on first access.
+    my_rec     = get_or_create_balance(db, current_user.id, friend_id)
+    friend_rec = get_or_create_balance(db, friend_id, current_user.id)
 
-    if not friend_owes_entries and not user_owes_entries:
+    recv = round(float(my_rec.to_receive), 2)
+    give = round(float(my_rec.to_give),    2)
+
+    if recv == 0.0 and give == 0.0:
         raise HTTPException(
             status_code=400,
-            detail="No active unmerged debts found between you and this friend",
+            detail="No active balances to merge between you and this friend",
         )
 
-    friend_owes_total = round(sum(p.amount_owed for p in friend_owes_entries), 2)
-    user_owes_total = round(sum(p.amount_owed for p in user_owes_entries), 2)
-    net = round(friend_owes_total - user_owes_total, 2)
+    # ── Calculate remainder ───────────────────────────────────────────────────
+    remainder = round(abs(recv - give), 2)
 
-    # Determine direction of the net debt
-    if net > 0:
-        from_user_id = friend_id       # friend owes current_user
-        to_user_id = current_user.id
-    elif net < 0:
-        from_user_id = current_user.id  # current_user owes friend
-        to_user_id = friend_id
+    # ── SQL UPDATE: both rows in one atomic transaction ───────────────────────
+    if recv > give:
+        # to_receive wins — I am still owed the difference
+        my_rec.to_receive     = remainder
+        my_rec.to_give        = 0.0
+        friend_rec.to_give    = remainder   # mirror: friend still owes me
+        friend_rec.to_receive = 0.0
+        direction = "friend_owes_you"
+    elif give > recv:
+        # to_give wins — I still owe the difference
+        my_rec.to_give        = remainder
+        my_rec.to_receive     = 0.0
+        friend_rec.to_receive = remainder   # mirror: friend is still owed
+        friend_rec.to_give    = 0.0
+        direction = "you_owe_friend"
     else:
-        # Net is zero — mark all as merged but create no debt record
-        group_id = str(uuid.uuid4())
-        for p in friend_owes_entries + user_owes_entries:
-            p.is_merged = True
-            p.merge_group_id = group_id
-        db.commit()
-        raise HTTPException(
-            status_code=200,
-            detail="Debts cancel out perfectly — all marked as merged, net is zero",
-        )
+        # Equal — fully settled
+        my_rec.to_receive     = 0.0
+        my_rec.to_give        = 0.0
+        friend_rec.to_receive = 0.0
+        friend_rec.to_give    = 0.0
+        direction = "settled"
 
-    # Generate a shared merge_group_id (UUID) linking originals to this Debt
-    group_id = str(uuid.uuid4())
-
-    # Build a human-readable description
-    all_entries = friend_owes_entries + user_owes_entries
-    bill_titles = list({
-        db.query(models.Bill).filter(models.Bill.id == p.bill_id).first().title
-        for p in all_entries
-    })
-    description = f"Merged {len(all_entries)} debt(s): {', '.join(bill_titles[:5])}"
-    if len(bill_titles) > 5:
-        description += f" and {len(bill_titles) - 5} more"
-
-    # Create the net Debt record
+    # ── Create Debt record for History ────────────────────────────────────────
+    desc_dir = "You Owe" if direction == "you_owe_friend" else "They Owe"
+    if direction == "settled":
+        description = f"Merged debts with {friend.username} — Settled"
+        from_user = current_user.id
+        to_user = friend_id
+    else:
+        description = f"Merged debts with {friend.username} — Remaining: LKR {remainder:.2f} ({desc_dir})"
+        from_user = current_user.id if direction == "you_owe_friend" else friend_id
+        to_user = friend_id if direction == "you_owe_friend" else current_user.id
+        
     debt = models.Debt(
-        from_user_id=from_user_id,
-        to_user_id=to_user_id,
-        net_amount=abs(net),
+        from_user_id=from_user,
+        to_user_id=to_user,
+        net_amount=remainder,
         description=description,
-        status=models.DebtStatus.active,
-        is_merged=False,          # This IS the merged result
-        merge_group_id=group_id,
+        status=models.DebtStatus.active if remainder > 0 else models.DebtStatus.settled,
+        is_merged=False
     )
     db.add(debt)
-    db.flush()  # Get debt.id before committing
 
-    # Mark all original BillParticipant rows as merged
-    for p in all_entries:
-        p.is_merged = True
-        p.merge_group_id = group_id
-
-    # Notify both users
+    # Notify the friend
     db.add(models.Notification(
         user_id=friend_id,
         message=(
-            f"{current_user.username} merged your debts — "
-            f"net: LKR {abs(net):.2f} "
-            f"({'you owe' if from_user_id == friend_id else 'they owe you'})"
+            f"{current_user.username} merged your balances — "
+            f"remainder: LKR {remainder:.2f} "
+            f"({'you owe' if direction == 'friend_owes_you' else 'they owe you' if direction == 'you_owe_friend' else 'settled'})"
         ),
         type="bill",
-        reference_id=debt.id,
+        reference_id=None,
     ))
 
     db.commit()
-    db.refresh(debt)
 
-    # Build source items for the response
-    sources = _build_sources(db, friend_owes_entries, user_owes_entries, current_user.id)
-
-    return schemas.MergeResult(
-        debt=debt,
-        sources=sources,
-        from_user=debt.from_user,
-        to_user=debt.to_user,
-        net_amount=abs(net),
-        message=(
-            f"Merged {len(all_entries)} debts. "
-            f"Net: LKR {abs(net):.2f} — "
-            f"{'friend owes you' if from_user_id == friend_id else 'you owe friend'}."
+    return {
+        "remainder": remainder,
+        "direction": direction,
+        "to_receive": float(my_rec.to_receive),
+        "to_give":    float(my_rec.to_give),
+        "message": (
+            f"Merged. Remainder LKR {remainder:.2f} — "
+            f"{'friend owes you' if direction == 'friend_owes_you' else 'you owe friend' if direction == 'you_owe_friend' else 'fully settled'}."
         ),
-    )
-
-
-def _build_sources(
-    db: Session,
-    friend_owes_entries: list,
-    user_owes_entries: list,
-    current_user_id: int,
-) -> list:
-    sources = []
-    for p in friend_owes_entries:
-        bill = db.query(models.Bill).filter(models.Bill.id == p.bill_id).first()
-        sources.append(schemas.MergeSourceItem(
-            bill_id=bill.id,
-            bill_title=bill.title,
-            bill_description=bill.description,
-            amount=p.amount_owed,
-            direction="they_owe",   # friend owes current_user
-            created_at=bill.created_at,
-        ))
-    for p in user_owes_entries:
-        bill = db.query(models.Bill).filter(models.Bill.id == p.bill_id).first()
-        sources.append(schemas.MergeSourceItem(
-            bill_id=bill.id,
-            bill_title=bill.title,
-            bill_description=bill.description,
-            amount=p.amount_owed,
-            direction="you_owe",    # current_user owes friend
-            created_at=bill.created_at,
-        ))
-    return sources
+    }
 
 
 @router.get("/", response_model=List[schemas.DebtOut])
@@ -255,7 +189,7 @@ def get_my_debts(
                 models.Debt.from_user_id == current_user.id,
                 models.Debt.to_user_id == current_user.id,
             ),
-            models.Debt.is_merged == False,  # Only the result records, not originals
+            models.Debt.is_merged == False,
         )
         .order_by(models.Debt.created_at.desc())
         .all()
@@ -298,7 +232,6 @@ def get_debt_sources(
     result = []
     for p in participants:
         bill = db.query(models.Bill).filter(models.Bill.id == p.bill_id).first()
-        # Direction from current_user's perspective
         direction = "they_owe" if bill.creator_id == current_user.id else "you_owe"
         result.append({
             "bill_id": bill.id,

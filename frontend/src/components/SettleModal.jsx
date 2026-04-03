@@ -13,14 +13,23 @@ export default function SettleModal({ friend, netBalance, onClose, onSettled }) 
 
   const handleSettle = async () => {
     if (!canPay) return
+    const parsed = parseFloat(amount)
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error('Please enter a valid positive amount')
+      return
+    }
+    if (parsed > Math.abs(netBalance) + 0.01) {
+      toast.error(`Amount cannot exceed LKR ${Math.abs(netBalance).toFixed(2)}`)
+      return
+    }
     setLoading(true)
     try {
       await api.post('/payments/', {
         payee_id: friend.id,
-        amount: parseFloat(amount),
+        amount: parsed,
         note: note || null,
       })
-      toast.success(`Payment of LKR ${amount} sent to ${friend.username}!`)
+      toast.success(`Payment of LKR ${parsed.toFixed(2)} sent to ${friend.username}!`)
       onSettled()
       onClose()
     } catch (err) {

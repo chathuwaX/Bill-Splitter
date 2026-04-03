@@ -104,7 +104,7 @@ export default function LoginPage() {
         </p>
 
         <div className={styles.demoHint}>
-          <strong>Demo:</strong> testuser / 123456
+          <strong>Demo:</strong> alice / demo1234
         </div>
       </div>
     </div>

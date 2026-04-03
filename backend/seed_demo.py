@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 import json
 
-BASE = "http://localhost:8000/api"
+BASE = "http://localhost:8000/api/v1"
 
 def post(path, data, token=None):
     body = json.dumps(data).encode()

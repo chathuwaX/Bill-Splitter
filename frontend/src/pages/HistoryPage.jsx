@@ -56,6 +56,10 @@ export default function HistoryPage() {
 
   const tabs = ['all', 'bills', 'payments', 'merged']
 
+  const todayStr = new Date().toLocaleDateString();
+  const recentFiltered = filtered.filter(t => t.date.toLocaleDateString() === todayStr);
+  const olderFiltered  = filtered.filter(t => t.date.toLocaleDateString() !== todayStr);
+
   return (
     <div className={`${styles.page} fade-in`}>
       <div className={styles.header}>
@@ -102,16 +106,46 @@ export default function HistoryPage() {
           </p>
         </div>
       ) : (
-        <div className={styles.timeline}>
-          {filtered.map(item => (
-            <TimelineItem
-              key={`${item.type}-${item.data.id}`}
-              item={item}
-              userId={user.id}
-              onAcceptPayment={acceptPayment}
-              onViewMerge={setViewDebt}
-            />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {recentFiltered.length > 0 && (
+            <div className={`glass`} style={{ padding: '16px', borderRadius: '12px' }}>
+              <div className={styles.sectionTitle} style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.95rem' }}>
+                <History size={16} /> Recent History (Today)
+              </div>
+              <div className={styles.timeline}>
+                {recentFiltered.map(item => (
+                  <TimelineItem
+                    key={`recent-${item.type}-${item.data.id}`}
+                    item={item}
+                    userId={user.id}
+                    onAcceptPayment={acceptPayment}
+                    onViewMerge={setViewDebt}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {olderFiltered.length > 0 && (
+            <div>
+              {recentFiltered.length > 0 && (
+                <div className={styles.sectionTitle} style={{ marginBottom: '12px', marginLeft: '4px', fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                  Older
+                </div>
+              )}
+              <div className={styles.timeline}>
+                {olderFiltered.map(item => (
+                  <TimelineItem
+                    key={`older-${item.type}-${item.data.id}`}
+                    item={item}
+                    userId={user.id}
+                    onAcceptPayment={acceptPayment}
+                    onViewMerge={setViewDebt}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

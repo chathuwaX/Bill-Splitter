@@ -28,13 +28,29 @@
 .empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 16px; color: var(--text-dim); text-align: center; }
 .emptyHint { font-size: 12px; color: var(--text-dim); }
 
-.friendRow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--card-border); }
-.friendRow:last-child { border-bottom: none; }
-.friendAvatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; flex-shrink: 0; }
-.friendInfo { flex: 1; min-width: 0; }
-.friendName { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
-.friendHandle { display: block; font-size: 11px; color: var(--text-dim); }
-.friendBalance { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.friendRow { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between;
+  gap: 12px; 
+  padding: 16px; 
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.friendRow:last-child { margin-bottom: 0; }
+.friendRow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.friendAvatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; }
+.friendInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.friendName { display: block; font-size: 14px; font-weight: 600; color: var(--text); font-family: 'Inter', system-ui, sans-serif; letter-spacing: 0.01em; }
+.friendHandle { display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.friendBalance { font-size: 15px; font-weight: 600; white-space: nowrap; }
 
 .billRow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--card-border); }
 .billRow:last-child { border-bottom: none; }
