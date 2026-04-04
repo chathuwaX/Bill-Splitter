@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
-import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle, Circle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle, Circle, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import AnimatedNumber from '../components/AnimatedNumber'
 import SkeletonCard from '../components/SkeletonCard'
@@ -39,11 +39,13 @@ export default function DashboardPage() {
   // Show a warning banner instead of silently defaulting to zero on DB failure
   const [dbError, setDbError] = useState(null)
   // Pending incoming payments (awaiting current user to accept) and unread notifications
+  const [payments, setPayments] = useState([])
   const [pendingPayments, setPendingPayments] = useState([])
   const [userNotifications, setUserNotifications] = useState([])
   // Track friend being paid
   const [payModalFriend, setPayModalFriend] = useState(null)
   const [payAmount, setPayAmount] = useState('')
+  const [payModalEffectiveAmount, setPayModalEffectiveAmount] = useState(0)
   const [isPaying, setIsPaying] = useState(false)
 
   // Skip the skeleton if we already have cached data — fresh data loads silently.
@@ -64,6 +66,7 @@ export default function DashboardPage() {
       setSummary(s.data); LS.set('summary', s.data);
       setFriends(f.data); LS.set('friends', f.data);
       setAllBills(b.data); LS.set('allBills', b.data);
+      setPayments(p.data);
       setPendingPayments(p.data.filter(pay => pay.status === 'pending'));
       setUserNotifications(n.data);
     }).catch(err => {
@@ -128,16 +131,27 @@ export default function DashboardPage() {
     setMergingId(null);
   };
 
-  const openPayModal = (friend, amount) => {
+  const openPayModal = (friend, effectiveAmount) => {
     setPayModalFriend(friend);
-    setPayAmount(amount.toFixed(2));
+    setPayAmount(effectiveAmount.toFixed(2));
+    setPayModalEffectiveAmount(effectiveAmount);
   };
 
   const handlePaySubmit = async (e) => {
     e.preventDefault();
     if (!payModalFriend) return;
+    
+    // ── [REFINEMENT] Sequential Validation & Balance Protection ──────────────
+    if (payModalEffectiveAmount <= 0) {
+      return toast.error('You are settled up! You cannot pay more until your previous payments are accepted.');
+    }
+
     const amt = parseFloat(payAmount);
     if (isNaN(amt) || amt <= 0) return toast.error('Enter a valid amount');
+    
+    if (amt > payModalEffectiveAmount) {
+      return toast.error(`You can only pay up to ${payModalEffectiveAmount.toFixed(2)} LKR. You have pending payments awaiting`);
+    }
 
     setIsPaying(true);
     try {
@@ -153,6 +167,22 @@ export default function DashboardPage() {
       toast.error(err.response?.data?.detail || 'Payment failed');
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const handleAcceptBill = async (billId) => {
+    try {
+      await api.post(`/bills/${billId}/accept`);
+      // Auto-mark notification as read if it exists
+      try {
+        const { data: notifs } = await api.get('/notifications/');
+        const match = notifs.find(n => !n.is_read && n.reference_id === billId && n.type === 'bill');
+        if (match) await api.post(`/notifications/${match.id}/read`);
+      } catch (_) { /* non-critical */ }
+      toast.success('Bill accepted!');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to accept bill');
     }
   };
 
@@ -186,13 +216,13 @@ export default function DashboardPage() {
   //   to_give    — I'm a debtor on a bill the friend created → You Owe Others
   let totalToReceive = 0;
   let totalToGive = 0;
-  
+
   // Calculate oldest unsettled date for each friend who has a balance
   const friendOldestDate = {} // friendId -> timestamp
   allBills.forEach(b => {
     const bDate = new Date(b.created_at + (b.created_at.endsWith('Z') ? '' : 'Z')).getTime()
     const isCreatorMe = b.creator?.id === user?.id
-    
+
     b.participants?.forEach(p => {
       // Check for pending bills
       if (p.status === 'pending') {
@@ -215,7 +245,7 @@ export default function DashboardPage() {
     totalToReceive += (to_receive ?? 0);
     totalToGive += (to_give ?? 0);
   });
-  
+
   totalToReceive = Math.round(totalToReceive * 100) / 100;
   totalToGive = Math.round(totalToGive * 100) / 100;
 
@@ -261,9 +291,9 @@ export default function DashboardPage() {
         )}
 
         <div className={styles.heroWrapper}>
-          <div className={`${styles.heroNetCard} glass`} style={{ 
+          <div className={`${styles.heroNetCard} glass`} style={{
             borderColor: computedNet === 0 && totalToReceive === 0 ? 'rgba(255,255,255,0.1)' : computedNet >= 0 ? 'rgba(38,222,129,0.3)' : 'rgba(255,107,107,0.3)',
-            background: computedNet === 0 && totalToReceive === 0 ? 'var(--card)' : computedNet >= 0 ? 'linear-gradient(135deg, rgba(38,222,129,0.1), rgba(38,222,129,0.02))' : 'linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,107,107,0.02))' 
+            background: computedNet === 0 && totalToReceive === 0 ? 'var(--card)' : computedNet >= 0 ? 'linear-gradient(135deg, rgba(38,222,129,0.1), rgba(38,222,129,0.02))' : 'linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,107,107,0.02))'
           }}>
             <div className={styles.heroNetLabel}>Total Net Balance</div>
             {computedNet === 0 && totalToReceive === 0 && totalToGive === 0 ? (
@@ -277,7 +307,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          
+
           <div className={styles.miniStatsRow}>
             <div className={`${styles.statCard} glass`}>
               <div className={styles.statIcon} style={{ background: 'rgba(38,222,129,0.15)' }}><TrendingUp size={20} color="var(--green)" /></div>
@@ -349,26 +379,79 @@ export default function DashboardPage() {
               const canMerge = recv > 0 && give > 0;
               const isMerging = mergingId === friend.id;
               const hasBalance = recv > 0 || give > 0;
-              // Find any pending payment from this friend to the current user
-              const pendingFromFriend = pendingPayments.find(p => p.payer_id === friend.id);
+              // Find all pending payments from this friend to the current user
+              const pendingFromFriendList = pendingPayments.filter(p => p.payer_id === friend.id);
+              
+              // [REFINEMENT] Unified Sequential Pending Queue
+              // Collect all pending items (both bills and payments) into a single queue
+              const pendingBillsList = (allBills || [])
+                .filter(b => (b.creator_id === friend.id || b.creator?.id === friend.id) &&
+                  b.participants?.some(p => p.user_id === user?.id && p.status === 'pending'))
+                .map(b => ({
+                  type: 'bill',
+                  id: b.id,
+                  amount: b.participants?.find(p => p.user_id === user?.id)?.amount_owed,
+                  title: b.title,
+                  created_at: b.created_at,
+                  friend_name: friend.full_name || friend.username
+                }));
+
+              const pendingPayList = pendingFromFriendList.map(p => ({
+                  type: 'payment',
+                  id: p.id,
+                  amount: p.amount,
+                  created_at: p.created_at,
+                  friend_name: friend.full_name || friend.username
+                }));
+
+              const pendingQueue = [...pendingBillsList, ...pendingPayList]
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              const topPending = pendingQueue[0];
 
               // (bill notifs: reference_id = bill.id, and that bill's creator is this friend)
               const unreadBillNotif = userNotifications.find(n =>
                 !n.is_read && n.type === 'bill' &&
                 allBills.find(b => b.id === n.reference_id && b.creator?.id === friend.id)
               );
-              const hasUnread = !!pendingFromFriend || !!unreadBillNotif;
 
-              // Check if currently waiting for this friend to accept a bill I sent
-              const sharedBillsWithFriend = (allBills || [])
-                .filter(b => ((b.creator_id || b.creator?.id) == user?.id) && b.participants?.some(p => p.user_id == friend.id))
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const hasUnread = pendingQueue.length > 0 || !!unreadBillNotif;
 
-              const latestSharedBill = sharedBillsWithFriend[0];
-              const latestStatus = latestSharedBill?.participants?.find(p => p.user_id == friend.id)?.status;
+              // Determine unified transaction status for the Status Icon next to Friend's name
+              const friendTransactions = [];
 
-              const isWaiting = latestStatus === 'pending';
-              const hasAcceptedBills = latestStatus === 'accepted';
+              payments.forEach(p => {
+                if ((p.payer_id === user?.id && p.payee_id === friend.id) ||
+                  (p.payee_id === user?.id && p.payer_id === friend.id)) {
+                  friendTransactions.push({ date: new Date(p.created_at || 0), status: p.status });
+                }
+              });
+
+              (allBills || []).forEach(b => {
+                const isCreatorUser = (b.creator_id || b.creator?.id) === user?.id;
+                const isCreatorFriend = (b.creator_id || b.creator?.id) === friend.id;
+                if (isCreatorUser) {
+                  const part = b.participants?.find(p => p.user_id === friend.id);
+                  if (part) friendTransactions.push({ date: new Date(b.created_at || 0), status: part.status });
+                } else if (isCreatorFriend) {
+                  const part = b.participants?.find(p => p.user_id === user?.id);
+                  if (part) friendTransactions.push({ date: new Date(b.created_at || 0), status: part.status });
+                }
+              });
+
+              friendTransactions.sort((a, b) => b.date - a.date);
+              // [REFINEMENT] Green Tick only if ALL pending items in the queue are settled
+              const isAccepted = pendingQueue.length === 0 && friendTransactions.length > 0 && friendTransactions[0].status === 'accepted';
+               
+              // [REFINEMENT] Fully Settled State (Zero balance + zero pending items)
+              const isFullySettled = (recv === 0 && give === 0 && pendingQueue.length === 0);
+
+              // [REFINEMENT] Calculate Effective Balance for overpayment protection
+              // Effective Balance = (Total amount I owe) - (Sum of pending payments I SENT)
+              const pendingSentToFriend = pendingPayments
+                .filter(p => p.payer_id === user?.id && p.payee_id === friend.id)
+                .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+              const effectiveBalance = Math.round((give - pendingSentToFriend) * 100) / 100;
 
               return (
                 <div key={friend.id} className={styles.friendRow}>
@@ -386,16 +469,14 @@ export default function DashboardPage() {
                     </div>
                     <div className={styles.friendInfo}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span className={styles.friendName}>{friend.full_name || friend.username}</span>
-                        {isWaiting ? (
-                          <div title="Waiting for them to accept" style={{ display: 'flex', color: 'var(--text-dim)', animation: 'fade-in 0.3s ease' }}>
-                            <Circle size={12} strokeWidth={3} />
-                          </div>
-                        ) : hasAcceptedBills ? (
-                          <div title="Bills accepted" style={{ display: 'flex', color: 'var(--green)', animation: 'pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
-                            <CheckCircle size={14} />
-                          </div>
-                        ) : null}
+                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                         {friend.full_name || friend.username}
+                         {!isFullySettled && (
+                           isAccepted 
+                             ? <CheckCircle size={15} style={{ color: 'var(--green)' }} /> 
+                             : <Circle size={15} style={{ color: 'var(--text-dim)', opacity: 0.5 }} />
+                         )}
+                       </span>
                       </div>
                       <span className={styles.friendHandle}>@{friend.username}</span>
                     </div>
@@ -404,10 +485,10 @@ export default function DashboardPage() {
                   {/* Data and Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end', flexGrow: 1 }}>
                     {/* Net Amount — single value, green = they owe you, red = you owe them */}
-                    {/* Net Amount — only show if no pending bill notification (otherwise it's in the button) */}
-                    {!unreadBillNotif && (
+                    {/* Net Amount — only show if NO pending items are waiting in the queue */}
+                    {pendingQueue.length === 0 && hasBalance && (
                       <div style={{ textAlign: 'right', minWidth: 90 }}>
-                        {hasBalance ? (() => {
+                        {(() => {
                           const net = recv - give
                           const isPositive = net > 0
                           const isNegative = net < 0
@@ -420,101 +501,89 @@ export default function DashboardPage() {
                               {isPositive ? '+' : isNegative ? '-' : ''}LKR {displayAmt}
                             </div>
                           )
-                        })() : (
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Settled ✓</div>
-                        )}
+                        })()}
                       </div>
                     )}
 
                     {/* Actions */}
-                    {(canMerge || give > 0 || pendingFromFriend || unreadBillNotif) && (
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {unreadBillNotif && (() => {
-                          const bill = allBills.find(b => b.id === unreadBillNotif.reference_id);
-                          const billTitle = bill?.title || 'a bill';
-                          const net = recv - give;
-                          const isPositive = net > 0;
-                          const isNegative = net < 0;
-                          const displayAmt = Math.abs(net).toFixed(2);
-                          const balanceText = `${isPositive ? '+' : isNegative ? '-' : ''}LKR ${displayAmt}`;
-                          
-                          return (
+                    {isFullySettled ? (
+                      <div className="fade-in" style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        color: 'var(--text-dim)', 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600,
+                        letterSpacing: '0.01em'
+                      }}>
+                        Settled <CheckCircle size={16} style={{ color: 'var(--text-dim)' }} />
+                      </div>
+                    ) : (
+                      (canMerge || give > 0 || pendingQueue.length > 0 || unreadBillNotif) && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {topPending && (
                             <button
-                              onClick={async () => {
-                                try {
-                                  await api.post(`/notifications/${unreadBillNotif.id}/read`);
-                                  loadData();
-                                } catch (_) { }
-                              }}
+                              onClick={() => topPending.type === 'bill' ? handleAcceptBill(topPending.id) : handleAcceptPayment(topPending.id)}
                               className="glass"
-                              title={`Acknowledge: ${friend.full_name || friend.username} added you to "${billTitle}"`}
+                              title={`Accept ${topPending.type}: LKR ${topPending.amount?.toFixed(2)}`}
                               style={{
                                 padding: '8px 16px', fontSize: '0.78rem', borderRadius: '10px',
-                                background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--card-border)',
+                                background: 'var(--bg3)', 
+                                color: topPending.type === 'bill' ? (topPending.friend_id === user?.id ? 'var(--green)' : 'var(--red)') : 'var(--green)',
+                                border: '1px solid var(--card-border)',
                                 cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '10px',
                                 textAlign: 'left', lineHeight: '1.2', maxWidth: '320px',
-                                transition: 'all 0.2s ease',
+                                transition: 'border-color 0.2s ease-in-out',
                                 boxShadow: 'var(--shadow-sm)'
                               }}
                               onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                               onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
                             >
-                              <CheckCircle size={14} style={{ flexShrink: 0 }} />
+                              <CheckCircle size={14} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ color: isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'inherit', fontWeight: 800, fontSize: '0.85rem' }}>
-                                  {balanceText}
+                                <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>
+                                  LKR {parseFloat(topPending.amount).toFixed(2)}
                                 </span>
-                                <span style={{ opacity: 0.8, fontSize: '0.7rem' }}>
-                                  {friend.full_name || friend.username} added you to "{billTitle}"
+                                <span style={{ opacity: 0.9, fontSize: '0.7rem', color: 'var(--text-dim)' }}>
+                                  {topPending.type === 'bill'
+                                    ? `${topPending.friend_name} added you to "${topPending.title}"`
+                                    : `${topPending.friend_name} sent you a payment`}
                                 </span>
                               </div>
                             </button>
-                          )
-                        })()}
-                        {pendingFromFriend && (
-                          <button
-                            onClick={() => handleAcceptPayment(pendingFromFriend.id)}
-                            className="glass"
-                            title={`Accept payment of LKR ${pendingFromFriend.amount?.toFixed(2)}`}
-                            style={{
-                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
-                              background: 'linear-gradient(135deg, var(--green), #059669)',
-                              color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '700',
-                              display: 'flex', alignItems: 'center', gap: '4px'
-                            }}
-                          >
-                            <CheckCircle size={13} /> Accept LKR {parseFloat(pendingFromFriend.amount).toFixed(2)}
-                          </button>
-                        )}
-                        {canMerge && (
-                          <button
-                            onClick={() => handleMerge(friend.id, recv, give)}
-                            disabled={isMerging}
-                            className="glass"
-                            style={{
-                              padding: '8px 16px', fontSize: '0.78rem', borderRadius: '10px',
-                              background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--card-border)',
-                              cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
-                          >
-                            {isMerging ? 'Merging…' : 'Merge'}
-                          </button>
-                        )}
-                        {give > 0 && (
-                          <button
-                            onClick={() => openPayModal(friend, give)}
-                            className="btn-primary"
-                            style={{
-                              padding: '8px 20px', fontSize: '0.8rem', borderRadius: '10px',
-                              cursor: 'pointer', fontWeight: '700'
-                            }}
-                          >
-                            Pay
-                          </button>
-                        )}
-                      </div>
+                          )}
+                          {canMerge && (
+                            <button
+                              onClick={() => handleMerge(friend.id, recv, give)}
+                              disabled={isMerging}
+                              className="glass"
+                              style={{
+                                padding: '8px 16px', fontSize: '0.78rem', borderRadius: '10px',
+                                background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--card-border)',
+                                cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
+                            >
+                              {isMerging ? 'Merging…' : 'Merge'}
+                            </button>
+                          )}
+                          {give > 0 && (
+                            <button
+                              onClick={() => openPayModal(friend, effectiveBalance)}
+                              className="btn-primary"
+                              style={{
+                                padding: '8px 20px', fontSize: '0.8rem', borderRadius: '10px',
+                                cursor: 'pointer', fontWeight: '700',
+                                opacity: effectiveBalance <= 0 ? 0.6 : 1,
+                                filter: effectiveBalance <= 0 ? 'grayscale(0.5)' : 'none'
+                              }}
+                            >
+                              {effectiveBalance <= 0 ? 'Settled Up' : 'Pay'}
+                            </button>
+                          )}
+                        </div>
+                      )
                     )}
                   </div>
                 </div>

@@ -85,8 +85,6 @@ def accept_payment(
     payment.accepted_at = datetime.utcnow()
 
     # ── Update persistent balances ─────────────────────────
-    # payer.to_give -= amount
-    # payee.to_receive -= amount
     payer_bal = get_or_create_balance(db, payment.payer_id, payment.payee_id)
     payee_bal = get_or_create_balance(db, payment.payee_id, payment.payer_id)
 

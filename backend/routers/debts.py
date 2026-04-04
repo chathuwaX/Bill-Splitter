@@ -89,19 +89,45 @@ def merge_debts(
     if not friendship:
         raise HTTPException(status_code=400, detail="Not friends with this user")
 
-    # ── Read current balances from friend_balances table ─────────────────────
-    # get_or_create_balance bootstraps from BillParticipants on first access.
+    # ── [REFINEMENT] Batch Settle Pending Payments ────────────────────────────
+    # Settle Up logic: Any incoming pending payments from this friend are accepted
+    # automatically before we calculate the final net merge.
+    incoming_payments = db.query(models.Payment).filter(
+        models.Payment.payer_id == friend_id,
+        models.Payment.payee_id == current_user.id,
+        models.Payment.status == models.PaymentStatus.pending
+    ).all()
+    
+    total_settled = 0.0
+    for p in incoming_payments:
+        p.status = models.PaymentStatus.accepted
+        p.accepted_at = datetime.utcnow()
+        total_settled += float(p.amount)
+        # Notify for each (or one aggregate later)
+        db.add(models.Notification(
+            user_id=friend_id,
+            message=f"{current_user.username} accepted your payment of LKR {p.amount:.2f} (via Settle Up)",
+            type="payment", reference_id=p.id
+        ))
+
+    # ── Update balances to reflect the settled payments ──
     my_rec     = get_or_create_balance(db, current_user.id, friend_id)
     friend_rec = get_or_create_balance(db, friend_id, current_user.id)
+    
+    if total_settled > 0:
+        my_rec.to_receive = max(0.0, round(float(my_rec.to_receive) - total_settled, 2))
+        friend_rec.to_give = max(0.0, round(float(friend_rec.to_give) - total_settled, 2))
+        db.flush()
 
     recv = round(float(my_rec.to_receive), 2)
     give = round(float(my_rec.to_give),    2)
 
     if recv == 0.0 and give == 0.0:
-        raise HTTPException(
-            status_code=400,
-            detail="No active balances to merge between you and this friend",
-        )
+        db.commit() # Save the accepted payments even if no other debts to merge
+        return {
+            "remainder": 0, "direction": "settled",
+            "message": f"Settled up! {len(incoming_payments)} payments accepted."
+        }
 
     # ── Calculate remainder ───────────────────────────────────────────────────
     remainder = round(abs(recv - give), 2)
@@ -132,8 +158,10 @@ def merge_debts(
     # ── Gather sources & Create Debt record for History ───────────────────────
     merge_uuid = str(uuid.uuid4())
     
+    # [STRICT RULE] Only merge bill participants that have been manually ACCEPTED
     participants_to_merge = db.query(models.BillParticipant).join(models.Bill).filter(
         models.BillParticipant.is_merged == False,
+        models.BillParticipant.status == models.ParticipantStatus.accepted,
         or_(
             and_(models.Bill.creator_id == current_user.id, models.BillParticipant.user_id == friend_id),
             and_(models.Bill.creator_id == friend_id, models.BillParticipant.user_id == current_user.id)

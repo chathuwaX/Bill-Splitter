@@ -1,0 +1,13 @@
+DEBTS:
+(16, 18, 17, 35000.0, 'Merged 2 debt(s): sfa, sda', 'active', 0, 'ee23de98-9f03-40c5-9102-1a792cfafb90', '2026-04-02 06:58:00', None)
+(15, 17, 18, 1388479.0, 'Merged 2 debt(s): fasfsda, fhgf', 'active', 0, '6fdb776f-f552-4550-ae24-73f227cea348', '2026-04-02 06:51:10', None)
+(14, 16, 17, 211216.0, 'Merged 2 debt(s): asfdasgg, sdasf', 'active', 0, '942969ae-037c-4f5f-b5cc-d59a7087c29d', '2026-04-02 06:47:33', None)
+(13, 17, 16, 500.0, 'Merged 2 debt(s): fadf, KFC', 'active', 0, '4e820ded-70fd-450d-babf-c48e6c13cc83', '2026-04-02 06:43:14', None)
+(12, 17, 16, 9500.0, 'Merged 2 debt(s): KFC', 'active', 0, '1617dfd1-7385-4e45-86c5-fce1378f717f', '2026-04-02 06:35:56', None)
+
+BILL PARTICIPANTS:
+(103, 50, 23, 100.0, 'accepted', 0, 0, None, '2026-04-02 15:15:52')
+(102, 50, 21, 100.0, 'accepted', 1, 0, None, '2026-04-02 15:15:52')
+(101, 49, 23, 1000.0, 'accepted', 0, 0, None, '2026-04-02 15:13:29')
+(100, 49, 21, 1000.0, 'accepted', 1, 0, None, '2026-04-02 15:13:29')
+(99, 48, 23, 1000.0, 'accepted', 1, 0, None, '2026-04-02 15:12:01')
