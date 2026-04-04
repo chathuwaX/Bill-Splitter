@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import { Receipt, Send, ArrowDownLeft, Check, History, GitMerge, Eye, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import SkeletonCard from '../components/SkeletonCard'
 import MergeDetailsModal from '../components/MergeDetailsModal'
 import styles from './HistoryPage.module.css'
@@ -198,9 +199,16 @@ function TimelineItem({ item, userId, onAcceptPayment, onDeclinePayment, onViewM
   if (type === 'bill') {
     const isCreator = data?.creator_id === userId
     const myParticipant = data?.participants?.find(p => p.user_id === userId)
+    const otherPerson = isCreator
+      ? data?.participants?.find(p => p.user_id !== userId)
+      : null
+    const linkTo = `/bills/${data.id}`
     return (
-      <div className={`${styles.timelineItem} glass`}>
-        <div className={styles.itemIcon} style={{ background: 'rgba(99,102,241,0.1)' }}><Receipt size={16} color="#6366f1" /></div>
+      <Link to={linkTo} className={`${styles.timelineItem} glass`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className={styles.itemIcon} style={{ background: 'rgba(99,102,241,0.1)', flexDirection: 'column', gap: '4px', width: '52px', height: '52px' }}>
+        <Receipt size={16} color="#6366f1" />
+        <span style={{ fontSize: '9px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bill</span>
+      </div>
         <div className={styles.itemContent}>
           <div className={styles.itemTitle}>{data?.title || 'Unknown Bill'}</div>
           <div className={styles.itemMeta}>
@@ -213,17 +221,19 @@ function TimelineItem({ item, userId, onAcceptPayment, onDeclinePayment, onViewM
           <div className={styles.itemDate}>{date?.toLocaleDateString() || ''}</div>
           {myParticipant && <span className={`badge ${myParticipant?.status === 'accepted' ? 'badge-accepted' : 'badge-pending'}`}>{myParticipant?.status}</span>}
         </div>
-      </div>
+      </Link>
     )
   }
 
   if (type === 'merge') {
     const iOwe = data?.from_user_id === userId
     const other = iOwe ? data?.to_user : data?.from_user
+    const linkTo = `/friends/${iOwe ? data?.to_user?.id : data?.from_user?.id}`
     return (
-      <div className={`${styles.timelineItem} ${styles.mergeItem} glass`}>
-        <div className={styles.itemIcon} style={{ background: 'rgba(99,102,241,0.15)' }}>
+      <Link to={linkTo} className={`${styles.timelineItem} ${styles.mergeItem} glass`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className={styles.itemIcon} style={{ background: 'rgba(99,102,241,0.15)', flexDirection: 'column', gap: '4px', width: '52px', height: '52px' }}>
           <GitMerge size={16} color="#6366f1" />
+          <span style={{ fontSize: '9px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Merge</span>
         </div>
         <div className={styles.itemContent}>
           <div className={styles.itemTitle}>
@@ -243,7 +253,7 @@ function TimelineItem({ item, userId, onAcceptPayment, onDeclinePayment, onViewM
             </button>
           </div>
         </div>
-      </div>
+      </Link>
     )
   }
 
@@ -259,10 +269,14 @@ function TimelineItem({ item, userId, onAcceptPayment, onDeclinePayment, onViewM
     ? (isSender ? `Payment of LKR ${amount.toFixed(2)} to ${payeeName} was successful` : `Received LKR ${amount.toFixed(2)} from ${payerName}`)
     : (isSender ? `Payment of LKR ${amount.toFixed(2)} to ${payeeName} was declined` : `You declined a payment of LKR ${amount.toFixed(2)} from ${payerName}`)
 
+  const paymentLinkTo = isSender ? `/friends/${data?.payee?.id}` : `/friends/${data?.payer?.id}`
   return (
-    <div className={`${styles.timelineItem} glass`}>
-      <div className={styles.itemIcon} style={{ background: data?.status === 'declined' ? 'rgba(100,116,139,0.1)' : isSender ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)' }}>
+    <Link to={paymentLinkTo} className={`${styles.timelineItem} glass`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className={styles.itemIcon} style={{ background: data?.status === 'declined' ? 'rgba(100,116,139,0.1)' : isSender ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', flexDirection: 'column', gap: '4px', width: '52px', height: '52px' }}>
         {data?.status === 'declined' ? <X size={16} color="#64748b" /> : isSender ? <Send size={16} color="#ef4444" /> : <ArrowDownLeft size={16} color="#10b981" />}
+        <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: data?.status === 'declined' ? '#64748b' : isSender ? '#ef4444' : '#10b981' }}>
+          {data?.status === 'declined' ? 'Declined' : isSender ? 'Sent' : 'Received'}
+        </span>
       </div>
       <div className={styles.itemContent}>
         <div className={styles.itemTitle}>{statusWording}</div>
@@ -284,7 +298,7 @@ function TimelineItem({ item, userId, onAcceptPayment, onDeclinePayment, onViewM
           </div>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 

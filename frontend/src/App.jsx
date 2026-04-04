@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import FriendsPage from './pages/FriendsPage'
 import FriendDetailPage from './pages/FriendDetailPage'
 import BillsPage from './pages/BillsPage'
+import BillDetailPage from './pages/BillDetailPage'
 import HistoryPage from './pages/HistoryPage'
 
 function PrivateRoute({ children }) {
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="friends" element={<FriendsPage />} />
               <Route path="friends/:friendId" element={<FriendDetailPage />} />
               <Route path="bills" element={<BillsPage />} />
+              <Route path="bills/:billId" element={<BillDetailPage />} />
               <Route path="history" element={<HistoryPage />} />
             </Route>
           </Routes>

@@ -290,8 +290,8 @@ export default function DashboardPage() {
 
               return (
                 <div key={friend.id} className={styles.friendRow}>
-                  {/* Friend Identity */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                  {/* Friend Identity — clickable → detail page */}
+                  <Link to={`/friends/${friend.id}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, textDecoration: 'none', cursor: 'pointer' }}>
                     <div style={{ position: 'relative' }}>
                       <div className={styles.friendAvatar} style={{ background: friend.avatar_color }}>{initials(friend.full_name || friend.username)}</div>
                       {hasUnread && (
@@ -306,7 +306,7 @@ export default function DashboardPage() {
                       <span className={styles.friendName}>{friend.full_name || friend.username}</span>
                       <span className={styles.friendHandle}>@{friend.username}</span>
                     </div>
-                  </div>
+                  </Link>
 
                   {/* Data and Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end', flexGrow: 1 }}>
@@ -424,7 +424,7 @@ export default function DashboardPage() {
               ) : allBills.slice(0, 5).map(bill => {
                 const parseDate = dStr => new Date(dStr + (!dStr.endsWith('Z') && !dStr.includes('+') ? 'Z' : ''));
                 return (
-                  <Link to="/bills" key={bill.id} className={styles.billRow} style={{ textDecoration: 'none' }}>
+                  <Link to={`/bills/${bill.id}`} key={bill.id} className={styles.billRow} style={{ textDecoration: 'none' }}>
                     <div className={styles.billIcon}><Receipt size={16} color="var(--primary)" /></div>
                     <div className={styles.billInfo}>
                       <span className={styles.billTitle}>{bill.title}</span>
