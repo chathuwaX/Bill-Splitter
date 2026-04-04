@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../api/client'
 import { LayoutDashboard, Users, Receipt, History, Bell, LogOut, Sun, Moon, Menu, X, Wallet, Plus } from 'lucide-react'
 import styles from './Layout.module.css'
+import GlobalSearch from './GlobalSearch'
 
 function formatRelativeTime(dateStr) {
   if (!dateStr) return ''
@@ -126,6 +127,7 @@ export default function Layout() {
           <button className={styles.menuBtn} onClick={() => setMobileOpen(o => !o)}>
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
+          <GlobalSearch />
           <div className={styles.headerRight}>
             <button className={styles.iconBtn} onClick={toggle} title="Toggle theme">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

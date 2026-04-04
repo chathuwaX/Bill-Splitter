@@ -64,7 +64,7 @@
 
 .header {
   height: 64px; background: var(--bg2); border-bottom: 1px solid var(--card-border);
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 12px;
   padding: 0 24px; position: sticky; top: 0; z-index: 50;
 }
 

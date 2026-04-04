@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
-import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle, Circle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import AnimatedNumber from '../components/AnimatedNumber'
 import SkeletonCard from '../components/SkeletonCard'
@@ -71,7 +71,11 @@ export default function DashboardPage() {
       setDbError('⚠️ Could not reach the database. Showing last known values — restart the backend server to reconnect.');
     }).finally(() => setLoading(false));
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    const interval = setInterval(loadData, 3000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleMerge = async (friendId, toReceive, toGive) => {
     // ── Step 1: Type-safe numbers (prevents NaN / string-concat bugs) ─────────
@@ -182,12 +186,51 @@ export default function DashboardPage() {
   //   to_give    — I'm a debtor on a bill the friend created → You Owe Others
   let totalToReceive = 0;
   let totalToGive = 0;
+  
+  // Calculate oldest unsettled date for each friend who has a balance
+  const friendOldestDate = {} // friendId -> timestamp
+  allBills.forEach(b => {
+    const bDate = new Date(b.created_at + (b.created_at.endsWith('Z') ? '' : 'Z')).getTime()
+    const isCreatorMe = b.creator?.id === user?.id
+    
+    b.participants?.forEach(p => {
+      // Check for pending bills
+      if (p.status === 'pending') {
+        if (isCreatorMe) {
+          // Friend owes me
+          if (!friendOldestDate[p.user_id] || bDate < friendOldestDate[p.user_id]) {
+            friendOldestDate[p.user_id] = bDate
+          }
+        } else if (p.user_id === user?.id) {
+          // I owe the creator
+          if (!friendOldestDate[b.creator?.id] || bDate < friendOldestDate[b.creator?.id]) {
+            friendOldestDate[b.creator?.id] = bDate
+          }
+        }
+      }
+    })
+  })
+
   friends.forEach(({ to_receive, to_give }) => {
     totalToReceive += (to_receive ?? 0);
     totalToGive += (to_give ?? 0);
   });
+  
   totalToReceive = Math.round(totalToReceive * 100) / 100;
   totalToGive = Math.round(totalToGive * 100) / 100;
+
+  // Filter and sort the top 3 oldest unsettled accounts
+  const oweMeOldest3 = friends
+    .filter(f => f.to_receive > 0)
+    .map(f => ({ ...f, oldest: friendOldestDate[f.friend.id] || Infinity }))
+    .sort((a, b) => a.oldest - b.oldest)
+    .slice(0, 3);
+
+  const iOweOldest3 = friends
+    .filter(f => f.to_give > 0)
+    .map(f => ({ ...f, oldest: friendOldestDate[f.friend.id] || Infinity }))
+    .sort((a, b) => a.oldest - b.oldest)
+    .slice(0, 3);
 
   // Net balance — always derived from DB-sourced values.
   const computedNet = Math.round((totalToReceive - totalToGive) * 100) / 100;
@@ -238,11 +281,40 @@ export default function DashboardPage() {
           <div className={styles.miniStatsRow}>
             <div className={`${styles.statCard} glass`}>
               <div className={styles.statIcon} style={{ background: 'rgba(38,222,129,0.15)' }}><TrendingUp size={20} color="var(--green)" /></div>
-              <div><p className={styles.statLabel}>Others owe you</p><p className={`${styles.statValue} amount-positive`}>LKR <AnimatedNumber value={totalToReceive} /></p></div>
+              <div>
+                <p className={styles.statLabel}>Others owe you</p>
+                <p className={`${styles.statValue} amount-positive`}>LKR <AnimatedNumber value={totalToReceive} /></p>
+              </div>
+              {oweMeOldest3.length > 0 && (
+                <div className={styles.avatarStack}>
+                  <div className={styles.avatarBubbleStack}>
+                    {oweMeOldest3.map(f => (
+                      <Link key={f.friend.id} to={`/friends/${f.friend.id}`} className={styles.avatarBubble} style={{ background: f.friend.avatar_color }} title={`${f.friend.full_name || f.friend.username}`}>
+                        {initials(f.friend.full_name || f.friend.username)}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className={`${styles.statCard} glass`}>
               <div className={styles.statIcon} style={{ background: 'rgba(255,107,107,0.15)' }}><TrendingDown size={20} color="var(--red)" /></div>
-              <div><p className={styles.statLabel}>You owe others</p><p className={`${styles.statValue} amount-negative`}>LKR <AnimatedNumber value={totalToGive} /></p></div>
+              <div>
+                <p className={styles.statLabel}>You owe others</p>
+                <p className={`${styles.statValue} amount-negative`}>LKR <AnimatedNumber value={totalToGive} /></p>
+              </div>
+              {iOweOldest3.length > 0 && (
+                <div className={styles.avatarStack}>
+                  <div className={styles.avatarBubbleStack}>
+                    {iOweOldest3.map(f => (
+                      <Link key={f.friend.id} to={`/friends/${f.friend.id}`} className={styles.avatarBubble} style={{ background: f.friend.avatar_color }} title={`${f.friend.full_name || f.friend.username}`}>
+                        {initials(f.friend.full_name || f.friend.username)}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -280,13 +352,23 @@ export default function DashboardPage() {
               // Find any pending payment from this friend to the current user
               const pendingFromFriend = pendingPayments.find(p => p.payer_id === friend.id);
 
-              // Find unread bill-type notifications from this friend
               // (bill notifs: reference_id = bill.id, and that bill's creator is this friend)
               const unreadBillNotif = userNotifications.find(n =>
                 !n.is_read && n.type === 'bill' &&
                 allBills.find(b => b.id === n.reference_id && b.creator?.id === friend.id)
               );
               const hasUnread = !!pendingFromFriend || !!unreadBillNotif;
+
+              // Check if currently waiting for this friend to accept a bill I sent
+              const sharedBillsWithFriend = (allBills || [])
+                .filter(b => ((b.creator_id || b.creator?.id) == user?.id) && b.participants?.some(p => p.user_id == friend.id))
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              const latestSharedBill = sharedBillsWithFriend[0];
+              const latestStatus = latestSharedBill?.participants?.find(p => p.user_id == friend.id)?.status;
+
+              const isWaiting = latestStatus === 'pending';
+              const hasAcceptedBills = latestStatus === 'accepted';
 
               return (
                 <div key={friend.id} className={styles.friendRow}>
@@ -303,58 +385,92 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className={styles.friendInfo}>
-                      <span className={styles.friendName}>{friend.full_name || friend.username}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className={styles.friendName}>{friend.full_name || friend.username}</span>
+                        {isWaiting ? (
+                          <div title="Waiting for them to accept" style={{ display: 'flex', color: 'var(--text-dim)', animation: 'fade-in 0.3s ease' }}>
+                            <Circle size={12} strokeWidth={3} />
+                          </div>
+                        ) : hasAcceptedBills ? (
+                          <div title="Bills accepted" style={{ display: 'flex', color: 'var(--green)', animation: 'pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                            <CheckCircle size={14} />
+                          </div>
+                        ) : null}
+                      </div>
                       <span className={styles.friendHandle}>@{friend.username}</span>
                     </div>
                   </Link>
 
                   {/* Data and Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end', flexGrow: 1 }}>
-                    {/* Amounts Container */}
-                    <div style={{ display: 'flex', gap: '16px', textAlign: 'right' }}>
-                      {give > 0 && (
-                        <div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>You Owe</div>
-                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--red)', whiteSpace: 'nowrap' }}>LKR {give.toFixed(2)}</div>
-                        </div>
-                      )}
-                      
-                      {recv > 0 && (
-                        <div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Others Owe</div>
-                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--green)', whiteSpace: 'nowrap' }}>LKR {recv.toFixed(2)}</div>
-                        </div>
-                      )}
-
-                      {!hasBalance && (
-                        <div className="amount-neutral" style={{ opacity: 0.6, fontSize: '0.9rem', whiteSpace: 'nowrap', marginTop: '8px' }}>
-                          Settled ✓
-                        </div>
-                      )}
-                    </div>
+                    {/* Net Amount — single value, green = they owe you, red = you owe them */}
+                    {/* Net Amount — only show if no pending bill notification (otherwise it's in the button) */}
+                    {!unreadBillNotif && (
+                      <div style={{ textAlign: 'right', minWidth: 90 }}>
+                        {hasBalance ? (() => {
+                          const net = recv - give
+                          const isPositive = net > 0
+                          const isNegative = net < 0
+                          const displayAmt = Math.abs(net).toFixed(2)
+                          return (
+                            <div style={{
+                              fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap',
+                              color: isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--text-muted)'
+                            }}>
+                              {isPositive ? '+' : isNegative ? '-' : ''}LKR {displayAmt}
+                            </div>
+                          )
+                        })() : (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Settled ✓</div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Actions */}
                     {(canMerge || give > 0 || pendingFromFriend || unreadBillNotif) && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {unreadBillNotif && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.post(`/notifications/${unreadBillNotif.id}/read`);
-                                loadData();
-                              } catch (_) {}
-                            }}
-                            className="glass"
-                            title="Mark bill notification as read"
-                            style={{
-                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
-                              background: 'rgba(0,255,194,0.15)', color: 'var(--primary)', border: '1px solid rgba(0,255,194,0.3)',
-                              cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px'
-                            }}
-                          >
-                            <CheckCircle size={13} /> Got it
-                          </button>
-                        )}
+                        {unreadBillNotif && (() => {
+                          const bill = allBills.find(b => b.id === unreadBillNotif.reference_id);
+                          const billTitle = bill?.title || 'a bill';
+                          const net = recv - give;
+                          const isPositive = net > 0;
+                          const isNegative = net < 0;
+                          const displayAmt = Math.abs(net).toFixed(2);
+                          const balanceText = `${isPositive ? '+' : isNegative ? '-' : ''}LKR ${displayAmt}`;
+                          
+                          return (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.post(`/notifications/${unreadBillNotif.id}/read`);
+                                  loadData();
+                                } catch (_) { }
+                              }}
+                              className="glass"
+                              title={`Acknowledge: ${friend.full_name || friend.username} added you to "${billTitle}"`}
+                              style={{
+                                padding: '8px 16px', fontSize: '0.78rem', borderRadius: '10px',
+                                background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--card-border)',
+                                cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '10px',
+                                textAlign: 'left', lineHeight: '1.2', maxWidth: '320px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: 'var(--shadow-sm)'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
+                            >
+                              <CheckCircle size={14} style={{ flexShrink: 0 }} />
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ color: isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'inherit', fontWeight: 800, fontSize: '0.85rem' }}>
+                                  {balanceText}
+                                </span>
+                                <span style={{ opacity: 0.8, fontSize: '0.7rem' }}>
+                                  {friend.full_name || friend.username} added you to "{billTitle}"
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })()}
                         {pendingFromFriend && (
                           <button
                             onClick={() => handleAcceptPayment(pendingFromFriend.id)}
@@ -376,9 +492,12 @@ export default function DashboardPage() {
                             disabled={isMerging}
                             className="glass"
                             style={{
-                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
-                              background: 'var(--card)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', fontWeight: '600'
+                              padding: '8px 16px', fontSize: '0.78rem', borderRadius: '10px',
+                              background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--card-border)',
+                              cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease'
                             }}
+                            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
                           >
                             {isMerging ? 'Merging…' : 'Merge'}
                           </button>
@@ -386,10 +505,10 @@ export default function DashboardPage() {
                         {give > 0 && (
                           <button
                             onClick={() => openPayModal(friend, give)}
-                            className="glass"
+                            className="btn-primary"
                             style={{
-                              padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px',
-                              background: 'var(--primary)', color: 'var(--bg)', border: 'none', cursor: 'pointer', fontWeight: '700'
+                              padding: '8px 20px', fontSize: '0.8rem', borderRadius: '10px',
+                              cursor: 'pointer', fontWeight: '700'
                             }}
                           >
                             Pay

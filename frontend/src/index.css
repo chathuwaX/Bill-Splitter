@@ -23,16 +23,28 @@
 }
 
 [data-theme="light"] {
-  --bg: #f0f4ff;
-  --bg2: #e8eeff;
-  --bg3: #ffffff;
-  --card: rgba(255,255,255,0.8);
-  --card-border: rgba(99,102,241,0.15);
-  --text: #1e1b4b;
-  --text-muted: #4b5563;
-  --text-dim: #9ca3af;
-  --shadow: 0 8px 32px rgba(99,102,241,0.12);
-  --shadow-sm: 0 4px 16px rgba(99,102,241,0.08);
+  /* Backgrounds — surface tones for depth */
+  --bg:  #F8FAFC;         /* Slate White - main content area */
+  --bg2: #F1F5F9;         /* Light Slate - sidebar, header */
+  --bg3: #FFFFFF;         /* Pure White - raised cards */
+
+  /* Cards */
+  --card: #FFFFFF;
+  --card-border: #E2E8F0;
+
+  /* Text — WCAG AA compliant */
+  --text:      #0F172A;   /* Deep Navy - primary text */
+  --text-muted:#475569;   /* Medium Slate - subtitles, labels */
+  --text-dim:  #94A3B8;   /* Light Slate - hints, timestamps */
+
+  /* Shadows — light mode uses shadows for hierarchy instead of glow */
+  --shadow:    0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+
+  /* Keep accent colours but darken primary for contrast on white */
+  --primary: #00C49A;     /* Slightly darker mint — readable on white */
+  --green:   #059669;
+  --red:     #DC2626;
 }
 
 body {
@@ -53,6 +65,28 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
+}
+
+/* Light mode: cards use solid white + drop shadow instead of blur */
+[data-theme="light"] .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow);
+}
+
+/* Light mode: search bar needs a visible background */
+[data-theme="light"] input[placeholder*="Search"] {
+  background: #F1F5F9 !important;
+  border: 1.5px solid #CBD5E1 !important;
+  color: #0F172A !important;
+}
+[data-theme="light"] input[placeholder*="Search"]::placeholder {
+  color: #94A3B8;
+}
+[data-theme="light"] input[placeholder*="Search"]:focus {
+  background: #FFFFFF !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(0,196,154,0.15) !important;
 }
 
 .btn {
