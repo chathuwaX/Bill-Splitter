@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
-import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle, Circle, Check } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Users, Receipt, ArrowRight, Send, CheckCircle, Circle, Check, BadgeCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import AnimatedNumber from '../components/AnimatedNumber'
 import SkeletonCard from '../components/SkeletonCard'
@@ -173,13 +173,8 @@ export default function DashboardPage() {
   const handleAcceptBill = async (billId) => {
     try {
       await api.post(`/bills/${billId}/accept`);
-      // Auto-mark notification as read if it exists
-      try {
-        const { data: notifs } = await api.get('/notifications/');
-        const match = notifs.find(n => !n.is_read && n.reference_id === billId && n.type === 'bill');
-        if (match) await api.post(`/notifications/${match.id}/read`);
-      } catch (_) { /* non-critical */ }
       toast.success('Bill accepted!');
+      window.dispatchEvent(new Event('refreshNotifications'));
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to accept bill');
@@ -189,13 +184,8 @@ export default function DashboardPage() {
   const handleAcceptPayment = async (paymentId) => {
     try {
       await api.post(`/payments/${paymentId}/accept`);
-      // Auto-mark the related notification as read so the red dot disappears
-      try {
-        const { data: notifs } = await api.get('/notifications/');
-        const match = notifs.find(n => !n.is_read && n.reference_id === paymentId && n.type === 'payment');
-        if (match) await api.post(`/notifications/${match.id}/read`);
-      } catch (_) { /* non-critical — don't block the main action */ }
       toast.success('Payment accepted! Balance updated.');
+      window.dispatchEvent(new Event('refreshNotifications'));
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to accept payment');
@@ -469,13 +459,8 @@ export default function DashboardPage() {
                     </div>
                     <div className={styles.friendInfo}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>
                          {friend.full_name || friend.username}
-                         {!isFullySettled && (
-                           isAccepted 
-                             ? <CheckCircle size={15} style={{ color: 'var(--green)' }} /> 
-                             : <Circle size={15} style={{ color: 'var(--text-dim)', opacity: 0.5 }} />
-                         )}
                        </span>
                       </div>
                       <span className={styles.friendHandle}>@{friend.username}</span>
@@ -487,7 +472,12 @@ export default function DashboardPage() {
                     {/* Net Amount — single value, green = they owe you, red = you owe them */}
                     {/* Net Amount — only show if NO pending items are waiting in the queue */}
                     {pendingQueue.length === 0 && hasBalance && (
-                      <div style={{ textAlign: 'right', minWidth: 90 }}>
+                      <div style={{ textAlign: 'right', minWidth: 90, display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
+                        {recv > 0 && (
+                          isAccepted 
+                            ? <BadgeCheck size={18} style={{ color: '#1D9BF0' }} /> 
+                            : <Circle size={16} style={{ color: 'var(--text-dim)', opacity: 0.5 }} />
+                        )}
                         {(() => {
                           const net = recv - give
                           const isPositive = net > 0
@@ -507,17 +497,19 @@ export default function DashboardPage() {
 
                     {/* Actions */}
                     {isFullySettled ? (
-                      <div className="fade-in" style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px', 
-                        color: 'var(--text-dim)', 
-                        fontSize: '0.85rem', 
-                        fontWeight: 600,
-                        letterSpacing: '0.01em'
-                      }}>
-                        Settled <CheckCircle size={16} style={{ color: 'var(--text-dim)' }} />
-                      </div>
+                      friendTransactions.length > 0 && (
+                        <div className="fade-in" style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          color: 'var(--text-dim)', 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600,
+                          letterSpacing: '0.01em'
+                        }}>
+                          Settled
+                        </div>
+                      )
                     ) : (
                       (canMerge || give > 0 || pendingQueue.length > 0 || unreadBillNotif) && (
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -539,7 +531,6 @@ export default function DashboardPage() {
                               onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                               onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--card-border)'}
                             >
-                              <CheckCircle size={14} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>
                                   LKR {parseFloat(topPending.amount).toFixed(2)}
@@ -571,7 +562,7 @@ export default function DashboardPage() {
                           {give > 0 && (
                             <button
                               onClick={() => openPayModal(friend, effectiveBalance)}
-                              className="btn-primary"
+                              className="btn btn-primary"
                               style={{
                                 padding: '8px 20px', fontSize: '0.8rem', borderRadius: '10px',
                                 cursor: 'pointer', fontWeight: '700',

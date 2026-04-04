@@ -34,7 +34,7 @@ export default function RegisterPage() {
         full_name: form.full_name.trim() || null,
       })
       login(r.data.access_token, r.data.user)
-      toast.success('Account created! Welcome to FriendBill 🎉')
+      toast.success('Account created! Welcome to OWEME 🎉')
       navigate('/', { replace: true })
     } catch (err) {
       const msg = err.response?.data?.detail || 'Registration failed. Please try again.'
@@ -55,8 +55,7 @@ export default function RegisterPage() {
       </div>
       <div className={`${styles.card} glass slide-up`}>
         <div className={styles.logoRow}>
-          <Wallet size={28} color="#6366f1" />
-          <h1 className={styles.appName}>FriendBill</h1>
+          <img src="/favicon.svg" alt="OWEME" className={styles.logoImg} />
         </div>
         <h2 className={styles.title}>Create account</h2>
         <p className={styles.subtitle}>Start splitting bills with your friends</p>

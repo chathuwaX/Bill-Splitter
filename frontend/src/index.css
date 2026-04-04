@@ -23,28 +23,28 @@
 }
 
 [data-theme="light"] {
-  /* Backgrounds — surface tones for depth */
-  --bg:  #F8FAFC;         /* Slate White - main content area */
-  --bg2: #F1F5F9;         /* Light Slate - sidebar, header */
-  --bg3: #FFFFFF;         /* Pure White - raised cards */
+  /* Material You inspired Surface Tones */
+  --bg:  #F7F9FB;         /* Extra light tinted surface */
+  --bg2: #EDF2F6;         /* Subtle secondary container for sidebar/header */
+  --bg3: #FFFFFF;         /* Cards remain crisp white */
 
-  /* Cards */
   --card: #FFFFFF;
-  --card-border: #E2E8F0;
+  --card-border: #E1E8EF; /* Tinted border */
 
-  /* Text — WCAG AA compliant */
-  --text:      #0F172A;   /* Deep Navy - primary text */
-  --text-muted:#475569;   /* Medium Slate - subtitles, labels */
-  --text-dim:  #94A3B8;   /* Light Slate - hints, timestamps */
+  /* Text — Deepened for better readability on tints */
+  --text:      #1A1C1E;
+  --text-muted:#42474E;
+  --text-dim:  #72777F;
 
-  /* Shadows — light mode uses shadows for hierarchy instead of glow */
-  --shadow:    0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  /* Elevation — Softer, multi-layered shadows */
+  --shadow:    0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
 
-  /* Keep accent colours but darken primary for contrast on white */
-  --primary: #00C49A;     /* Slightly darker mint — readable on white */
-  --green:   #059669;
-  --red:     #DC2626;
+  /* Primary Branding Tint */
+  --primary: #006B5B;     /* Material You Dark Teal */
+  --primary-light: #33897C;
+  --green:   #006C4C;
+  --red:     #BA1A1A;
 }
 
 body {

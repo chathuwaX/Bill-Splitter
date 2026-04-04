@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
-import { ArrowLeft, Receipt, Users, CalendarDays, CheckCircle, Clock, GitMerge } from 'lucide-react'
+import { ArrowLeft, Receipt, Users, CalendarDays, CheckCircle, Clock, GitMerge, BadgeCheck } from 'lucide-react'
 
 const initials = name => name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '??'
 const parseDate = d => new Date(d + (!d.endsWith('Z') && !d.includes('+') ? 'Z' : ''))
@@ -117,7 +117,7 @@ export default function BillDetailPage() {
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>LKR {parseFloat(p.amount_owed || 0).toFixed(2)}</div>
                   <div style={{ fontSize: 11, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
                     {p.status === 'accepted'
-                      ? <><CheckCircle size={11} color="var(--green)" /><span style={{ color: 'var(--green)' }}>Settled</span></>
+                      ? <><BadgeCheck size={14} style={{ color: '#1D9BF0' }} /><span style={{ color: '#1D9BF0', fontWeight: 600 }}>Settled</span></>
                       : <><Clock size={11} color="#ffa500" /><span style={{ color: '#ffa500' }}>Pending</span></>
                     }
                   </div>

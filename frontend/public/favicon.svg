@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Black Rounded Square Background -->
+  <rect width="32" height="32" rx="6" fill="black"/>
+  <!-- 4 White Dots -->
+  <circle cx="10" cy="10" r="4" fill="white"/>
+  <circle cx="22" cy="10" r="4" fill="white"/>
+  <circle cx="10" cy="22" r="4" fill="white"/>
+  <circle cx="22" cy="22" r="4" fill="white"/>
+</svg>

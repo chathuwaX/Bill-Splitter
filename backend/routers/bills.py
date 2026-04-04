@@ -6,6 +6,7 @@ import models
 import schemas
 from typing import List
 from routers.friends import get_or_create_balance
+from routers.notifications import mark_notif_read_by_ref
 
 router = APIRouter(prefix="/api/v1/bills", tags=["bills"])
 
@@ -166,5 +167,9 @@ def accept_bill(
         message=f"{current_user.username} accepted the bill '{bill.title}'",
         type="bill", reference_id=bill_id
     ))
+    
+    # Auto-mark the incoming notification as read for the current user
+    mark_notif_read_by_ref(db, current_user.id, "bill", bill_id)
+    
     db.commit()
     return {"message": "Bill accepted"}

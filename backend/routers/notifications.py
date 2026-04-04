@@ -7,6 +7,17 @@ import schemas
 from typing import List
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
+ 
+ 
+def mark_notif_read_by_ref(db: Session, user_id: int, type: str, ref_id: int):
+    """Internal helper to mark a notification as read based on its reference."""
+    db.query(models.Notification).filter(
+        models.Notification.user_id == user_id,
+        models.Notification.type == type,
+        models.Notification.reference_id == ref_id,
+        models.Notification.is_read == False
+    ).update({"is_read": True})
+    # No commit here; assume the caller will commit
 
 
 @router.get("/", response_model=List[schemas.NotificationOut])
@@ -46,3 +57,17 @@ def mark_read(
         notif.is_read = True
         db.commit()
     return {"message": "Marked as read"}
+
+@router.post("/read-by-type")
+def mark_read_by_type(
+    type: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.id,
+        models.Notification.type == type,
+        models.Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"message": f"All {type} notifications marked as read"}

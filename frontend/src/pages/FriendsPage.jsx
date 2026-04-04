@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../api/client'
 import toast from 'react-hot-toast'
 import { UserPlus, Search, Check } from 'lucide-react'
@@ -16,7 +16,18 @@ export default function FriendsPage() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (searchParams.get('add') === 'true') {
+      setShowAddModal(true)
+      // Clear the param after opening
+      const newParams = new URLSearchParams(searchParams)
+      newParams.delete('add')
+      setSearchParams(newParams, { replace: true })
+    }
+  }, [searchParams])
 
   const load = async () => {
     try {
@@ -60,6 +71,7 @@ export default function FriendsPage() {
   const acceptRequest = async id => {
     await api.post(`/friends/accept/${id}`)
     toast.success('Friend request accepted!')
+    window.dispatchEvent(new Event('refreshNotifications'))
     load()
   }
 
@@ -83,7 +95,7 @@ export default function FriendsPage() {
             <h3 className={styles.sectionTitle}>Pending Requests</h3>
             {requests.map(r => (
               <div key={r.id} className={styles.requestRow}>
-                <div className={styles.avatar} style={{ background: r.requester.avatar_color }}>{initials(r.requester.full_name || r.requester.username)}</div>
+                <div className={styles.avatar} style={{ background: r.requester.avatar_color, width: 40, height: 40, flexShrink: 0 }}>{initials(r.requester.full_name || r.requester.username)}</div>
                 <div className={styles.info}>
                   <span className={styles.name}>{r.requester.full_name || r.requester.username}</span>
                   <span className={styles.handle}>@{r.requester.username}</span>
@@ -152,19 +164,36 @@ function AddFriendModal({ onClose, onAdded }) {
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(new Set())
 
-  const search = async () => {
-    if (!query.trim()) return
+  const search = async (q = query) => {
+    if (!q.trim()) {
+      setResults([])
+      return
+    }
     setLoading(true)
-    try { const r = await api.get(`/friends/search?q=${encodeURIComponent(query)}`); setResults(r.data) }
-    finally { setLoading(false) }
+    try { 
+      const r = await api.get(`/friends/search?q=${encodeURIComponent(q)}`)
+      setResults(r.data) 
+    } catch (err) {
+      console.error('Search failed', err)
+    } finally { 
+      setLoading(false) 
+    }
   }
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      search()
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [query])
 
   const sendRequest = async userId => {
     try {
       await api.post('/friends/request', { username: results.find(u => u.id === userId)?.username })
-      setSent(s => new Set([...s, userId]))
       toast.success('Friend request sent!')
       onAdded()
+      onClose()
     } catch (err) { toast.error(err.response?.data?.detail || 'Failed to send request') }
   }
 

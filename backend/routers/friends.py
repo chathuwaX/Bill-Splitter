@@ -6,6 +6,7 @@ from auth import get_current_user
 import models
 import schemas
 from typing import List
+from routers.notifications import mark_notif_read_by_ref
 
 router = APIRouter(prefix="/api/v1/friends", tags=["friends"])
 
@@ -145,6 +146,11 @@ def accept_friend_request(
         message=f"{current_user.username} accepted your friend request",
         type="friend", reference_id=current_user.id
     ))
+    
+    # Auto-mark the incoming friend request notification as read
+    # Reference ID for friend requests is the requester's ID
+    mark_notif_read_by_ref(db, current_user.id, "friend", friendship.requester_id)
+    
     db.commit()
     return {"message": "Friend request accepted"}
 

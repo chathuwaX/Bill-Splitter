@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/client'
 import toast from 'react-hot-toast'
-import { Plus, Receipt, Check, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Receipt, Check, Users, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import Modal from '../components/Modal'
 import SkeletonCard from '../components/SkeletonCard'
 import styles from './BillsPage.module.css'
@@ -35,6 +35,7 @@ export default function BillsPage() {
   const acceptBill = async billId => {
     await api.post(`/bills/${billId}/accept`)
     toast.success('Bill accepted!')
+    window.dispatchEvent(new Event('refreshNotifications'))
     load()
   }
 
@@ -126,6 +127,7 @@ function CreateBillModal({ onClose, onCreated }) {
   const [customSplit, setCustomSplit] = useState(false)
   const [splits, setSplits] = useState({})
   const [loading, setLoading] = useState(false)
+  const [friendSearch, setFriendSearch] = useState('')
 
   useEffect(() => { api.get('/friends/').then(r => setFriends(r.data)) }, [])
 
@@ -138,6 +140,38 @@ function CreateBillModal({ onClose, onCreated }) {
     ? (parseFloat(form.total_amount) / allParticipants.length).toFixed(2) : '0.00'
 
   const toggleFriend = id => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+ 
+  useEffect(() => {
+    if (customSplit && allParticipants.length > 0) {
+      const initialSplits = {}
+      allParticipants.forEach(p => {
+        initialSplits[p.id] = equalShare
+      })
+      setSplits(initialSplits)
+    }
+  }, [customSplit, allParticipants.length, form.total_amount])
+
+  const handleSplitChange = (userId, newValStr) => {
+    const total = parseFloat(form.total_amount) || 0
+    const newVal = parseFloat(newValStr) || 0
+    
+    const others = allParticipants.filter(p => p.id !== userId)
+    if (others.length === 0) {
+      setSplits({ [userId]: total.toFixed(2) })
+      return
+    }
+
+    const remaining = Math.max(0, total - newVal)
+    const sharePerOther = (remaining / others.length).toFixed(2)
+    
+    const newSplits = { ...splits }
+    newSplits[userId] = newValStr
+    others.forEach(p => {
+      newSplits[p.id] = sharePerOther
+    })
+    
+    setSplits(newSplits)
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -165,14 +199,32 @@ function CreateBillModal({ onClose, onCreated }) {
         <div><label>Description</label><textarea placeholder="Optional description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical', minHeight: 70 }} /></div>
         <div>
           <label>Select Friends *</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+          <div className={styles.searchWrap} style={{ marginTop: 8 }}>
+            <Search size={14} className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Filter friends..." 
+              value={friendSearch}
+              onChange={e => setFriendSearch(e.target.value)}
+              className={styles.searchInput}
+              style={{ margin: 0 }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4, maxHeight: 120, overflowY: 'auto', padding: '4px 2px' }}>
             {friends.length === 0 ? <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No friends yet. Add friends first.</p>
-              : friends.map(({ friend }) => (
+              : friends.filter(({ friend }) => 
+                  (friend.full_name || friend.username).toLowerCase().includes(friendSearch.toLowerCase())
+                ).map(({ friend }) => (
               <button key={friend.id} type="button" onClick={() => toggleFriend(friend.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, border: '1px solid', borderColor: selected.includes(friend.id) ? 'var(--primary)' : 'var(--card-border)', background: selected.includes(friend.id) ? 'rgba(99,102,241,0.15)' : 'var(--card)', color: selected.includes(friend.id) ? 'var(--primary-light)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', transition: 'all 0.15s' }}>
                 <div style={{ width: 20, height: 20, borderRadius: '50%', background: friend.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>{initials(friend.full_name || friend.username)}</div>
                 {friend.username}{selected.includes(friend.id) && <Check size={12} />}
               </button>
             ))}
+            {friends.length > 0 && friends.filter(({ friend }) => 
+              (friend.full_name || friend.username).toLowerCase().includes(friendSearch.toLowerCase())
+            ).length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 0' }}>No matches found</p>
+            )}
           </div>
         </div>
         {selected.length > 0 && (
@@ -189,7 +241,15 @@ function CreateBillModal({ onClose, onCreated }) {
                 {allParticipants.map(p => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 13, flex: 1 }}>{p.username} {p.id === user.id ? '(you)' : ''}</span>
-                    <input type="number" step="0.01" min="0" placeholder="0.00" value={splits[p.id] || ''} onChange={e => setSplits(s => ({ ...s, [p.id]: e.target.value }))} style={{ width: 120 }} />
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      min="0" 
+                      placeholder="0.00" 
+                      value={splits[p.id] || ''} 
+                      onChange={e => handleSplitChange(p.id, e.target.value)} 
+                      style={{ width: 120 }} 
+                    />
                   </div>
                 ))}
               </div>}

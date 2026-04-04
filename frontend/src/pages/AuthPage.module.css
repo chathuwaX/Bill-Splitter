@@ -27,13 +27,24 @@
   50% { transform: translate(20px, -20px) scale(1.05); }
 }
 
-.card { width: 100%; max-width: 420px; padding: 40px; position: relative; z-index: 1; }
+.card { width: 100%; max-width: 420px; padding: 40px; position: relative; z-index: 1; overflow: hidden; }
 
-.logoRow { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-.appName {
-  font-size: 22px; font-weight: 800;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+.logoRow { 
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: -40px -40px 28px -40px; padding: 0;
+  background: #000000; width: calc(100% + 80px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  height: 200px;
+}
+.logoImg {
+  height: 120px; width: 120px; object-fit: contain;
+  /* Since favicon.svg is B&W with a black background, it blends perfectly with the black logoRow */
+  filter: none;
+  mix-blend-mode: normal;
+}
+:global([data-theme="light"]) .logoImg {
+  /* In light mode, the logoRow is still black (as requested by user previously) */
+  filter: none;
 }
 
 .title { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
@@ -94,6 +105,7 @@
 @media (max-width: 640px) {
   .page { padding: 16px; align-items: flex-start; padding-top: 40px; }
   .card { padding: 28px 20px; }
+  .logoRow { margin: -28px -20px 24px -20px; width: calc(100% + 40px); height: 160px; }
   .blob1 { width: 280px; height: 280px; top: -60px; left: -60px; }
   .blob2 { width: 240px; height: 240px; bottom: -40px; right: -40px; }
   .title { font-size: 22px; }

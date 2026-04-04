@@ -45,3 +45,7 @@
   .billRight { align-items: flex-start; }
   .empty { padding: 40px 16px; }
 }
+ 
+.searchWrap { position: relative; margin-bottom: 12px; }
+.searchIcon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
+.searchInput { padding-left: 36px !important; font-size: 13px !important; height: 38px !important; }

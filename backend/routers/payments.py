@@ -8,6 +8,7 @@ import models
 import schemas
 from typing import List
 from routers.friends import get_or_create_balance
+from routers.notifications import mark_notif_read_by_ref
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
@@ -103,6 +104,10 @@ def accept_payment(
         message=f"{current_user.username} accepted your payment of LKR {payment.amount:.2f}",
         type="payment", reference_id=payment_id
     ))
+    
+    # Auto-mark the incoming payment notification as read
+    mark_notif_read_by_ref(db, current_user.id, "payment", payment_id)
+    
     db.commit()
     return {"message": "Payment accepted"}
 
@@ -128,6 +133,10 @@ def decline_payment(
         message=f"{current_user.username} declined your payment of LKR {payment.amount:.2f}",
         type="payment", reference_id=payment_id
     ))
+    
+    # Auto-mark the incoming payment notification as read
+    mark_notif_read_by_ref(db, current_user.id, "payment", payment_id)
+    
     db.commit()
     return {"message": "Payment declined"}
 
